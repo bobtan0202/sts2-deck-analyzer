@@ -9570,10 +9570,10 @@ const HEROES = [
   }
 ];
 
-const IMPLEMENTED_CHARACTER_IDS = ["ironclad"];
-const PREPARATION_CHARACTER_IDS = ["silent", "defect", "regent", "necrobinder"];
+const IMPLEMENTED_CHARACTER_IDS = ["ironclad", "silent"];
+const PREPARATION_CHARACTER_IDS = ["defect", "regent", "necrobinder"];
 const SHARED_CARD_GROUP_IDS = ["colorless", "ancient", "event", "status", "curse"];
-const ENABLE_SILENT_FULL_ANALYSIS = false;
+const ENABLE_SILENT_FULL_ANALYSIS = true;
 
 const CHARACTER_DATA = Object.fromEntries(HEROES.map(hero => [hero.id, {
   id: hero.id,
@@ -9657,6 +9657,146 @@ let rarityFilter = "all";
 let tagFilter = "all";
 let currentAct = "act1";
 
+
+// implementation19-performance-optimization-v1
+// Silent Phase2.5以降の重処理対策：タグSet化・分析キャッシュ・描画差分化・ループ制限
+const PERF_LIMITS = {
+  maxHandSamples: 900,
+  maxBestTurnStates: 1800,
+  maxBestTurnDepth: 20
+};
+const analysisCache = new Map();
+let lastCardRenderState = { signature:"", ids:"" };
+let lastTagTabsSignature = "";
+
+function ensureTagSet(card){
+  if(!card) return new Set();
+  if(!card._tagSet){
+    Object.defineProperty(card, "_tagSet", {
+      value: new Set(Array.isArray(card.tags) ? card.tags : []),
+      enumerable:false,
+      configurable:true
+    });
+  }
+  return card._tagSet;
+}
+function hasTagFast(card, tag){ return ensureTagSet(card).has(tag); }
+function hasAnyTagFast(card, tags){
+  const set = ensureTagSet(card);
+  return tags.some(t=>set.has(t));
+}
+function specialHas(card, key){ return Array.isArray(card?.specialCalc) && card.specialCalc.includes(key); }
+function deckSignature(list){
+  return (list || []).map(x => `${x.id}${x.upgraded?"+":""}${x.enchanted?"@":""}`).sort().join("|");
+}
+function visibleCardSignature(cards){ return cards.map(c=>c.id).join("|"); }
+function combinationCount(n,k){
+  if(k<0 || k>n) return 0;
+  k=Math.min(k,n-k);
+  let r=1;
+  for(let i=1;i<=k;i++) r = r*(n-k+i)/i;
+  return Math.round(r);
+}
+function combosSample(arr,k,maxCount=PERF_LIMITS.maxHandSamples){
+  const total = combinationCount(arr.length,k);
+  if(total <= maxCount) return combos(arr,k);
+  const out=[];
+  const seen=new Set();
+  const target=Math.max(1,maxCount);
+  const step = total / target;
+  function unrank(index){
+    let result=[];
+    let x=0;
+    let remaining=k;
+    let rank=Math.floor(index);
+    for(let pos=0; pos<k; pos++){
+      for(let i=x; i<arr.length; i++){
+        const count=combinationCount(arr.length-i-1, remaining-1);
+        if(rank < count){
+          result.push(arr[i]);
+          x=i+1;
+          remaining--;
+          break;
+        }
+        rank -= count;
+      }
+    }
+    return result;
+  }
+  for(let i=0;i<target;i++){
+    const idx=Math.min(total-1, Math.floor(i*step));
+    const hand=unrank(idx);
+    const key=hand.map(c=>c.instanceId).join("|");
+    if(!seen.has(key)){
+      seen.add(key);
+      out.push(hand);
+    }
+  }
+  return out;
+}
+function filteredCardsForCurrentView(){
+  const searchEl=document.getElementById("search");
+  const q=(searchEl ? searchEl.value : "").trim().toLowerCase();
+  return getCurrentCharacterCards()
+    .filter(c=>!["ironclad","silent","regent"].includes(currentCharacter) || c.character === currentCharacter)
+    .filter(c=>typeFilter==="all" || c.type===typeFilter)
+    .filter(c=>rarityFilter==="all" || normalizeRarity(c.rarity)===rarityFilter)
+    .filter(c=>tagFilter==="all" || hasTagFast(c, tagFilter))
+    .filter(c=>{
+      if(!q) return true;
+      const tagText=(c.tags||[]).join(" ").toLowerCase();
+      return c.nameJa.toLowerCase().includes(q)||c.nameEn.toLowerCase().includes(q)||c.id.toLowerCase().includes(q)||tagText.includes(q);
+    });
+}
+function updateRenderedCardCounts(){
+  const target = editTarget==="deck" ? deck : nextPicks;
+  document.querySelectorAll("#cards .cardItem[data-card-id]").forEach(div=>{
+    const id=div.getAttribute("data-card-id");
+    const normal=div.querySelector('[data-count-kind="normal"]');
+    const upgraded=div.querySelector('[data-count-kind="upgraded"]');
+    const enchanted=div.querySelector('[data-count-kind="enchanted"]');
+    if(normal) normal.textContent = `${countIn(target,id,false,false)}枚`;
+    if(upgraded) upgraded.textContent = `${countIn(target,id,true,false)}枚`;
+    if(enchanted) enchanted.textContent = `${countIn(target,id,false,true)}枚`;
+  });
+}
+
+function invalidateAnalysisCache(){
+  if(analysisCache && typeof analysisCache.clear === "function") analysisCache.clear();
+}
+function refreshAfterDeckMutation(){
+  invalidateAnalysisCache();
+  renderCurrentCharacterBadges();
+  renderAnalysis();
+  renderMissingCards();
+  if(!document.getElementById("view-carddb")?.classList.contains("hidden")){
+    updateRenderedCardCounts();
+  }
+}
+function syncCharacterTabButtons(rootId, buttonClass, activeId){
+  const root=document.getElementById(rootId);
+  if(!root) return;
+  const wantedIds = new Set(HEROES.map(h=>h.id));
+  root.querySelectorAll(`.${buttonClass}[data-hero-id]`).forEach(btn=>{
+    if(!wantedIds.has(btn.dataset.heroId)) btn.remove();
+  });
+  HEROES.forEach(hero=>{
+    let b=root.querySelector(`.${buttonClass}[data-hero-id="${hero.id}"]`);
+    if(!b){
+      b=document.createElement("button");
+      b.className=buttonClass;
+      b.dataset.heroId=hero.id;
+      root.appendChild(b);
+    }
+    const pending = !isCharacterImplemented(hero.id);
+    b.className = buttonClass + (hero.id===activeId ? " active" : "") + (pending ? " pending" : "");
+    b.textContent = hero.nameJa || hero.name;
+    b.disabled = pending;
+    b.title = pending ? "準備中" : "";
+    b.onclick = pending ? null : (()=>setHero(hero.id,true));
+  });
+}
+
 function cardById(id){ return CARD_DB.find(c => c.id === id) || CARD_DB[0]; }
 function getCard(inst){
   const base = cardById(inst.id);
@@ -9704,15 +9844,17 @@ function showAppTab(tab, btn){
 function addCard(id, upgraded=false, enchanted=false){
   const target = editTarget === "deck" ? deck : nextPicks;
   target.push({id, upgraded, enchanted});
-  renderAll();
+  refreshAfterDeckMutation();
 }
 function removeCard(id, upgraded=false, enchanted=false){
   const target = editTarget === "deck" ? deck : nextPicks;
   const idx = target.map(x=>x.id===id && x.upgraded===upgraded && !!x.enchanted===!!enchanted).lastIndexOf(true);
-  if (idx >= 0) target.splice(idx,1);
-  renderAll();
+  if (idx >= 0){
+    target.splice(idx,1);
+    refreshAfterDeckMutation();
+  }
 }
-function clearNextPicks(){ nextPicks=[]; renderAll(); }
+function clearNextPicks(){ nextPicks=[]; refreshAfterDeckMutation(); }
 function resetDeck(){ resetStarterDeck(); }
 function countIn(target,id,upgraded,enchanted=false){ return target.filter(x=>x.id===id && x.upgraded===upgraded && !!x.enchanted===!!enchanted).length; }
 
@@ -9773,16 +9915,21 @@ function applyCard(card,state,deckList,remainCount){
 }
 function bestTurn(hand,deckList,mode){
   const memo=new Map();
+  let visitedStates = 0;
   function key(cards,state){return cards.map(c=>c.instanceId).sort().join("|")+"::"+state.energy+":"+state.strength+":"+state.vulnerable+":"+state.block+":"+state.firstBlockDoubleAvailable;}
-  function dfs(cards,state){
+  function dfs(cards,state,depth=0){
+    if(depth > PERF_LIMITS.maxBestTurnDepth || visitedStates > PERF_LIMITS.maxBestTurnStates){
+      return {damage:0,block:0,line:[]};
+    }
     const k=key(cards,state); if(memo.has(k)) return memo.get(k);
+    visitedStates++;
     let best={damage:0,block:0,line:[]};
     for(let i=0;i<cards.length;i++){
       const card=cards[i]; if(card.unplayable) continue; if(card.cost>state.energy) continue;
       const nextCards=cards.filter((_,idx)=>idx!==i);
       const before={...state,energy:state.energy-card.cost};
       const played=applyCard(card,before,deckList,cards.length);
-      const rest=dfs(nextCards,played.state);
+      const rest=dfs(nextCards,played.state,depth+1);
       const total={damage:played.damage+rest.damage,block:played.block+rest.block,line:[card.nameJa,...rest.line]};
       const score=mode==="block"?total.block*1000+total.damage:total.damage*1000+total.block;
       const bestScore=mode==="block"?best.block*1000+best.damage:best.damage*1000+best.block;
@@ -9790,7 +9937,7 @@ function bestTurn(hand,deckList,mode){
     }
     memo.set(k,best); return best;
   }
-  return dfs(hand,{energy:3,strength:0,vulnerable:0,block:0,firstBlockDoubleAvailable:false});
+  return dfs(hand,{energy:3,strength:0,vulnerable:0,block:0,firstBlockDoubleAvailable:false},0);
 }
 
 
@@ -9800,7 +9947,7 @@ function analyzeHandBrickBreakdown(hands, deckList){
   hands.forEach(h=>{
     const playableCards = h.filter(c=>!c.unplayable && Number(c.cost) <= 3);
     const attackCards = h.filter(c=>c.type === "attack" && !c.unplayable);
-    const defenseCards = h.filter(c=>(c.block || c.blockPerNonAttack || c.blockDamage || c.tags?.includes("防御")) && !c.unplayable);
+    const defenseCards = h.filter(c=>(c.block || c.blockPerNonAttack || c.blockDamage || hasTagFast(c,"防御")) && !c.unplayable);
     const handCost = playableCards.reduce((sum,c)=>sum+(Number(c.cost)||0),0);
     const handEnergyGain = h.reduce((sum,c)=>sum+(Number(c.energyGain)||0),0);
     const heavyCards = playableCards.filter(c=>Number(c.cost) >= 2).length;
@@ -10002,10 +10149,12 @@ function setAct(act, btn){
 
 
 function analyzeDeck(deckList){
+  const cacheKey = `${currentAct}::${deckSignature(deckList)}`;
+  if(analysisCache.has(cacheKey)) return analysisCache.get(cacheKey);
   const instances=deckList.map((x,i)=>({...getCard(x),instanceId:x.id+"#"+i}));
   const handSize=Math.min(5,instances.length);
-  const allHands=combos(instances,handSize);
-  const hands=sampleArray(allHands, 1200);
+  const exactHandCount=combinationCount(instances.length,handSize);
+  const hands=combosSample(instances,handSize,PERF_LIMITS.maxHandSamples);
   const turnDamage=hands.map(h=>bestTurn(h,deckList,"damage"));
   const turnBlock=hands.map(h=>bestTurn(h,deckList,"block"));
   const avg=xs=>xs.reduce((a,b)=>a+b,0)/Math.max(1,xs.length);
@@ -10022,22 +10171,22 @@ function analyzeDeck(deckList){
   const skills=cards.filter(c=>c.type==="skill").length;
   const powers=cards.filter(c=>c.type==="power").length;
   const draw=cards.filter(c=>c.draw).length;
-  const exhaust=cards.filter(c=>c.exhaust||c.exhaustHand||c.exhaustNonAttack||c.tags?.includes("廃棄")).length;
-  const strength=cards.filter(c=>c.strength||c.tags?.includes("筋力")).length;
-  const front=cards.filter(c=>c.tags?.includes("フロントロード")).length;
-  const aoe=cards.filter(c=>c.aoe||c.tags?.includes("AoE")).length;
+  const exhaust=cards.filter(c=>c.exhaust||c.exhaustHand||c.exhaustNonAttack||hasTagFast(c,"廃棄")).length;
+  const strength=cards.filter(c=>c.strength||hasTagFast(c,"筋力")).length;
+  const front=cards.filter(c=>hasTagFast(c,"フロントロード")).length;
+  const aoe=cards.filter(c=>c.aoe||hasTagFast(c,"AoE")).length;
   const low=cards.filter(c=>c.cost<=1).length;
   const zeroCost=cards.filter(c=>c.cost===0).length;
-  const energy=cards.filter(c=>c.energyGain || c.tags?.includes("エナジー")).length;
+  const energy=cards.filter(c=>c.energyGain || hasTagFast(c,"エナジー")).length;
   const highCost=cards.filter(c=>c.cost>=2).length;
-  const longScaling=cards.filter(c=>c.tags?.includes("スケーリング") || c.tags?.includes("長期スケーリング") || c.tags?.includes("筋力") || c.specialCalc?.includes("rampageScaling") || c.specialCalc?.includes("playRandomAttackEndTurn")).length;
+  const longScaling=cards.filter(c=>hasTagFast(c,"スケーリング") || hasTagFast(c,"長期スケーリング") || hasTagFast(c,"筋力") || c.specialCalc?.includes("rampageScaling") || c.specialCalc?.includes("playRandomAttackEndTurn")).length;
   const drawAmount=cards.reduce((sum,c)=>sum+(Number(c.draw)||0)+(Number(c.drawNext)||0),0);
-  const searchCards=cards.filter(c=>c.specialCalc?.some(x=>String(x).includes("search")) || c.tags?.includes("サーチ") || c.tags?.includes("山札操作")).length;
-  const chainCards=cards.filter(c=>c.cost===0 || c.draw || c.energyGain || c.specialCalc?.includes("duplicateNextAttack") || c.specialCalc?.includes("nextAttackFree") || c.tags?.includes("手数") || c.tags?.includes("手数シナジー")).length;
-  const defenseCards=cards.filter(c=>c.block || c.blockPerNonAttack || c.blockDamage || c.tags?.includes("防御") || c.tags?.includes("軽減") || c.tags?.includes("耐久")).length;
-  const damageReductionCards=cards.filter(c=>c.weak || c.enemyStrengthLoss || c.strengthLoss || c.tags?.includes("脱力") || c.specialCalc?.includes("intangible")).length;
-  const dexCards=cards.filter(c=>c.dex || c.tags?.includes("敏捷") || c.tags?.includes("dex")).length;
-  const growthCards=cards.filter(c=>c.tags?.includes("長期スケーリング") || c.scalingOnKill || c.rampage || c.specialCalc?.some(x=>String(x).includes("Scaling"))).length;
+  const searchCards=cards.filter(c=>c.specialCalc?.some(x=>String(x).includes("search")) || hasTagFast(c,"サーチ") || hasTagFast(c,"山札操作")).length;
+  const chainCards=cards.filter(c=>c.cost===0 || c.draw || c.energyGain || c.specialCalc?.includes("duplicateNextAttack") || c.specialCalc?.includes("nextAttackFree") || hasTagFast(c,"手数") || hasTagFast(c,"手数シナジー")).length;
+  const defenseCards=cards.filter(c=>c.block || c.blockPerNonAttack || c.blockDamage || hasTagFast(c,"防御") || hasTagFast(c,"軽減") || hasTagFast(c,"耐久")).length;
+  const damageReductionCards=cards.filter(c=>c.weak || c.enemyStrengthLoss || c.strengthLoss || hasTagFast(c,"脱力") || c.specialCalc?.includes("intangible")).length;
+  const dexCards=cards.filter(c=>c.dex || hasTagFast(c,"敏捷") || hasTagFast(c,"dex")).length;
+  const growthCards=cards.filter(c=>hasTagFast(c,"長期スケーリング") || c.scalingOnKill || c.rampage || c.specialCalc?.some(x=>String(x).includes("Scaling"))).length;
   // 0〜100%の診断スコア。普通のスターター〜中盤デッキが30〜70に収まりやすいよう調整。
   const deckRotationScore=Math.max(0,Math.min(100,Math.round(
     18 + draw*10 + zeroCost*4 + exhaust*4 + energy*6 - highCost*4 - Math.max(0,n-15)*1.2
@@ -10138,8 +10287,8 @@ function analyzeDeck(deckList){
     warnings: actEvaluation.warnings
   };
 
-  return {
-    deckSize:deckList.length, handCount:allHands.length, sampledHandCount:hands.length,
+  const result = {
+    deckSize:deckList.length, handCount:exactHandCount, sampledHandCount:hands.length,
     oneTurnMaxDamage:maxD.damage, twoTurnMaxDamage:twoTurnMax, avgDamage:avg(turnDamage.map(x=>x.damage)),
     oneTurnMaxBlock:maxB.block, avgBlock:avg(turnBlock.map(x=>x.block)),
     oneTurnMaxDamageLine:maxD.line, oneTurnMaxBlockLine:maxB.line, twoTurnLine,
@@ -10170,6 +10319,12 @@ function analyzeDeck(deckList){
     radar:diagnosis.radar,
     diagnosis
   };
+  analysisCache.set(cacheKey, result);
+  if(analysisCache.size > 40){
+    const firstKey = analysisCache.keys().next().value;
+    analysisCache.delete(firstKey);
+  }
+  return result;
 }
 function detectFloatingCards(cards, s){
   const out=[];
@@ -10221,13 +10376,13 @@ function analyzeSilentAxes(cards){
   const calc = key => c => c.specialCalc?.includes(key);
   const poisonApply = count(c=>c.poison || c.tags?.includes("毒"));
   const poisonコンボ札 = count(c=>c.id?.includes("catalyst") || c.catalystMultiplier || c.tags?.includes("フィニッシャー") && c.tags?.includes("毒") || c.specialCalc?.includes("multiplyPoison"));
-  const poisonAoe = count(c=>c.tags?.includes("毒") && (c.aoe || c.tags?.includes("AoE")));
-  const poisonDefense = count(c=>c.block || c.weak || c.tags?.includes("防御") || c.tags?.includes("脱力") || c.tags?.includes("防御補助"));
+  const poisonAoe = count(c=>c.tags?.includes("毒") && (c.aoe || hasTagFast(c,"AoE")));
+  const poisonDefense = count(c=>c.block || c.weak || hasTagFast(c,"防御") || hasTagFast(c,"脱力") || c.tags?.includes("防御補助"));
   const draw = count(c=>c.draw || c.drawNext || c.tags?.includes("ドロー"));
   const shivGen = count(c=>c.shiv || c.tags?.includes("ナイフ"));
-  const shivBoost = count(c=>c.shivDamageBonus || c.id?.includes("accuracy") || c.tags?.includes("ナイフ") && c.tags?.includes("スケーリング"));
-  const action = count(c=>c.cost===0 || c.tags?.includes("手数") || c.draw || c.energyGain);
-  const energy = count(c=>c.energyGain || c.tags?.includes("エナジー") || c.cost===0);
+  const shivBoost = count(c=>c.shivDamageBonus || c.id?.includes("accuracy") || c.tags?.includes("ナイフ") && hasTagFast(c,"スケーリング"));
+  const action = count(c=>c.cost===0 || hasTagFast(c,"手数") || c.draw || c.energyGain);
+  const energy = count(c=>c.energyGain || hasTagFast(c,"エナジー") || c.cost===0);
   const discard起動札s = count(c=>c.discard || c.tags?.includes("スライ") || c.specialCalc?.some(x=>String(x).toLowerCase().includes("スライ")));
   const discardコンボ札s = count(c=>c.drawOnDiscard || c.energyOnDiscard || c.specialCalc?.some(x=>["whenDiscardedDraw","whenDiscardedEnergy","discardCostDown","freeIfDiscarded"].includes(x)));
   const rotation = count(c=>c.draw || c.energyGain || c.cost===0 || c.tags?.includes("回転") || c.tags?.includes("ドロー"));
@@ -10310,17 +10465,17 @@ function analyzeSilentFlow(cards, metrics){
   const poisonApply = count(c=>c.poison || c.tags?.includes("毒"));
   const poisonコンボ札 = count(c=>c.catalystMultiplier || c.specialCalc?.includes("multiplyPoison") || (c.tags?.includes("毒") && c.tags?.includes("フィニッシャー")));
   const shivGen = count(c=>c.shiv || c.specialCalc?.includes("addShivs") || c.specialCalc?.includes("addInkyShivs") || c.specialCalc?.includes("shivEachTurn"));
-  const shivBoost = count(c=>c.shivDamageBonus || c.specialCalc?.includes("shivDamageBonus") || (c.tags?.includes("ナイフ") && c.tags?.includes("スケーリング")));
+  const shivBoost = count(c=>c.shivDamageBonus || c.specialCalc?.includes("shivDamageBonus") || (c.tags?.includes("ナイフ") && hasTagFast(c,"スケーリング")));
   const discard起動札s = count(c=>c.discard || c.tags?.includes("スライ") || c.specialCalc?.some(x=>String(x).toLowerCase().includes("スライ")));
   const discardコンボ札s = count(c=>c.drawOnDiscard || c.energyOnDiscard || c.specialCalc?.some(x=>["whenDiscardedDraw","whenDiscardedEnergy","discardCostDown","freeIfDiscarded"].includes(x)));
   const drawCards = count(c=>c.draw || c.drawNext || c.tags?.includes("ドロー") || c.tags?.includes("回転"));
   const setupCards = count(c=>c.tags?.includes("セットアップ") || c.specialCalc?.some(x=>String(x).includes("Setup") || String(x).includes("copyCardNextTurn") || String(x).includes("putCardTopDeck")));
   const finisherCards = count(c=>c.tags?.includes("フィニッシャー") || c.catalystMultiplier || c.specialCalc?.includes("multiplyPoison") || c.specialCalc?.includes("attackPlayedScaling"));
-  const defenseCards = count(c=>c.block || c.weak || c.strengthLoss || c.tags?.includes("防御") || c.tags?.includes("脱力") || c.tags?.includes("防御補助"));
-  const aoeCards = count(c=>c.aoe || c.tags?.includes("AoE"));
+  const defenseCards = count(c=>c.block || c.weak || c.strengthLoss || hasTagFast(c,"防御") || hasTagFast(c,"脱力") || c.tags?.includes("防御補助"));
+  const aoeCards = count(c=>c.aoe || hasTagFast(c,"AoE"));
   const heavyCards = count(c=>Number(c.cost) >= 2);
   const zeroCost = count(c=>Number(c.cost) === 0);
-  const energyCards = count(c=>c.energyGain || c.energyOnDiscard || c.tags?.includes("エナジー"));
+  const energyCards = count(c=>c.energyGain || c.energyOnDiscard || hasTagFast(c,"エナジー"));
 
   const issues=[];
   const strengths=[];
@@ -10428,22 +10583,22 @@ function analyzeSilentWinConditionValidation(cards, metrics){
   const longScalingScore = metrics?.longScalingScore || 0;
 
   const drawCards = count(c=>c.draw || c.drawNext || c.tags?.includes("ドロー") || c.tags?.includes("回転"));
-  const energyCards = count(c=>c.energyGain || c.energyOnDiscard || c.tags?.includes("エナジー"));
+  const energyCards = count(c=>c.energyGain || c.energyOnDiscard || hasTagFast(c,"エナジー"));
   const zeroCost = count(c=>Number(c.cost) === 0);
-  const aoeCards = count(c=>c.aoe || c.tags?.includes("AoE"));
-  const defenseCards = count(c=>c.block || c.weak || c.strengthLoss || c.tags?.includes("防御") || c.tags?.includes("脱力") || c.tags?.includes("防御補助"));
+  const aoeCards = count(c=>c.aoe || hasTagFast(c,"AoE"));
+  const defenseCards = count(c=>c.block || c.weak || c.strengthLoss || hasTagFast(c,"防御") || hasTagFast(c,"脱力") || c.tags?.includes("防御補助"));
   const setupCards = count(c=>c.tags?.includes("セットアップ") || c.specialCalc?.some(x=>String(x).toLowerCase().includes("セットアップ") || String(x).toLowerCase().includes("copycard") || String(x).toLowerCase().includes("topdeck")));
 
   const poisonApply = count(c=>c.poison || c.tags?.includes("毒"));
   const poisonAmount = cards.reduce((sum,c)=>sum + (Number(c.poison)||0) * (Number(c.hits)||1),0);
   const poisonAccel = count(c=>c.catalystMultiplier || c.id?.includes("catalyst") || c.specialCalc?.includes("multiplyPoison") || c.id?.includes("accelerant") || c.nameJa?.includes("促進剤"));
-  const poisonLong = count(c=>c.tags?.includes("毒") && (c.type === "power" || c.tags?.includes("スケーリング") || c.tags?.includes("長期スケーリング")));
+  const poisonLong = count(c=>c.tags?.includes("毒") && (c.type === "power" || hasTagFast(c,"スケーリング") || hasTagFast(c,"長期スケーリング")));
   const poisonSpeed = count(c=>c.tags?.includes("毒") && (Number(c.cost) <= 1 || c.draw || c.energyGain));
   const poisonScore = clampScore(poisonApply*13 + poisonAmount*2 + poisonAccel*18 + poisonLong*10 + Math.min(defenseCards,4)*5 + Math.min(drawCards,4)*5 + aoeCards*4 + poisonSpeed*4 - Math.max(0, energyLoadScore-60)*0.25);
 
   const shivGen = count(c=>c.shiv || c.specialCalc?.includes("addShivs") || c.specialCalc?.includes("addInkyShivs") || c.specialCalc?.includes("shivEachTurn") || c.id?.includes("shiv"));
-  const shivBoost = count(c=>c.shivDamageBonus || c.specialCalc?.includes("shivDamageBonus") || c.id?.includes("accuracy") || (c.tags?.includes("ナイフ") && c.tags?.includes("スケーリング")));
-  const shivAction = count(c=>c.cost===0 || c.tags?.includes("手数") || c.draw || c.energyGain || c.shiv);
+  const shivBoost = count(c=>c.shivDamageBonus || c.specialCalc?.includes("shivDamageBonus") || c.id?.includes("accuracy") || (c.tags?.includes("ナイフ") && hasTagFast(c,"スケーリング")));
+  const shivAction = count(c=>c.cost===0 || hasTagFast(c,"手数") || c.draw || c.energyGain || c.shiv);
   const shivFinish = count(c=>c.tags?.includes("フィニッシャー") || c.specialCalc?.includes("attackPlayedScaling") || c.specialCalc?.includes("damageAllOnCardPlayed"));
   const shivScore = clampScore(shivGen*18 + shivBoost*20 + Math.min(shivAction,7)*5 + Math.min(drawCards,4)*5 + Math.min(energyCards+zeroCost,5)*5 + shivFinish*8 - Math.max(0, actionShortageRate*100-20)*0.35);
 
@@ -10583,11 +10738,11 @@ function detectPrimaryDeckCharacter(cards){
 function buildGenericSupportMetrics(cards, metrics){
   const count = predicate => cards.filter(predicate).length;
   const drawCards = count(c=>c.draw || c.drawNext || c.tags?.includes("ドロー") || c.tags?.includes("回転"));
-  const energyCards = count(c=>c.energyGain || c.energyOnDiscard || c.energyNext || c.tags?.includes("エナジー"));
+  const energyCards = count(c=>c.energyGain || c.energyOnDiscard || c.energyNext || hasTagFast(c,"エナジー"));
   const zeroCost = count(c=>Number(c.cost) === 0);
-  const aoeCards = count(c=>c.aoe || c.tags?.includes("AoE"));
-  const defenseCards = count(c=>c.block || c.weak || c.strengthLoss || c.tags?.includes("防御") || c.tags?.includes("脱力") || c.tags?.includes("防御補助"));
-  const compressionCards = count(c=>c.exhaust || c.tags?.includes("廃棄") || c.tags?.includes("圧縮") || c.specialCalc?.some(x=>String(x).toLowerCase().includes("廃棄")));
+  const aoeCards = count(c=>c.aoe || hasTagFast(c,"AoE"));
+  const defenseCards = count(c=>c.block || c.weak || c.strengthLoss || hasTagFast(c,"防御") || hasTagFast(c,"脱力") || c.tags?.includes("防御補助"));
+  const compressionCards = count(c=>c.exhaust || hasTagFast(c,"廃棄") || c.tags?.includes("圧縮") || c.specialCalc?.some(x=>String(x).toLowerCase().includes("廃棄")));
   return [
     {key:"ドロー", name:"ドロー能力", score:clampScore(drawCards*18 + (metrics.deckRotationScore||0)*0.25)},
     {key:"compression", name:"圧縮能力", score:clampScore(compressionCards*13 + zeroCost*4 + (metrics.compressionRate||0)*0.35)},
@@ -11008,41 +11163,41 @@ function inferHeroFromDeck(deckList){
   });
   return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0] || currentHero;
 }
+function refreshAfterCharacterChange(){
+  invalidateAnalysisCache();
+  renderHeroSelector();
+  renderCharacters();
+  renderCurrentCharacterBadges();
+  renderAnalysis();
+  renderMissingCards();
+  if(!document.getElementById("view-carddb")?.classList.contains("hidden")){
+    renderCards();
+  }
+}
 function setHero(heroId, reset=true){
+  if(!isCharacterImplemented(heroId)) return;
   currentHero = heroId;
   currentCharacter = heroId;
   typeFilter = "all";
   rarityFilter = "all";
   tagFilter = "all";
+  lastTagTabsSignature = "";
+  lastCardRenderState = { signature:"", ids:"" };
   document.querySelectorAll(".typeTab").forEach((b,i)=>b.classList.toggle("active",i===0));
   document.querySelectorAll(".rarityTab").forEach((b,i)=>b.classList.toggle("active",i===0));
   if(reset){
     deck = cloneStarterDeck(heroId);
     nextPicks = [];
-    if(!deck.length && !isCharacterImplemented(heroId)){
-      // 準備中キャラはUI表示だけ行い、Ironclad既存分析を壊さないため空デッキにする。
-      deck = [];
-    }
   }
-  renderAll();
+  refreshAfterCharacterChange();
 }
 function resetStarterDeck(){
   deck = cloneStarterDeck(currentHero);
   nextPicks = [];
-  renderAll();
+  refreshAfterCharacterChange();
 }
 function renderHeroSelector(){
-  const root=document.getElementById("heroTabs");
-  if(!root) return;
-  root.innerHTML="";
-  HEROES.forEach(hero=>{
-    const b=document.createElement("button");
-    const pending = !isCharacterImplemented(hero.id);
-    b.className="heroTab"+(hero.id===currentHero?" active":"")+(pending?" pending":"");
-    b.textContent=hero.nameJa || hero.name;
-    b.onclick=()=>setHero(hero.id,true);
-    root.appendChild(b);
-  });
+  syncCharacterTabButtons("heroTabs", "heroTab", currentHero);
   const hero=heroById(currentHero);
   const desc=document.getElementById("heroDescription");
   if(desc) desc.textContent=`${hero.nameJa}：${hero.description}`;
@@ -11056,17 +11211,7 @@ function renderHeroSelector(){
 }
 
 function renderCharacters(){
-  const root=document.getElementById("characterTabs");
-  if(!root) return;
-  root.innerHTML="";
-  HEROES.forEach(hero=>{
-    const pending = !isCharacterImplemented(hero.id);
-    const b=document.createElement("button");
-    b.className="charTab"+(hero.id===currentCharacter?" active":"")+(pending?" pending":"");
-    b.textContent=hero.nameJa || hero.name;
-    b.onclick=()=>setHero(hero.id, true);
-    root.appendChild(b);
-  });
+  syncCharacterTabButtons("characterTabs", "charTab", currentCharacter);
 }
 
 function normalizeRarity(rarity){
@@ -11134,7 +11279,11 @@ function renderTagTabs(){
   const cards = getCurrentCharacterCards();
   const tags = [...new Set(cards.flatMap(c=>c.tags||[]))].sort((a,b)=>a.localeCompare(b,"ja"));
   if(tagFilter !== "all" && !tags.includes(tagFilter)) tagFilter = "all";
-  const primary = PRIMARY_TAGS.filter(t=>tags.includes(t));
+  const signature = `${currentCharacter}|${tagFilter}|${tags.join("|")}`;
+  if(signature === lastTagTabsSignature) return;
+  lastTagTabsSignature = signature;
+  const tagSet = new Set(tags);
+  const primary = PRIMARY_TAGS.filter(t=>tagSet.has(t));
   const rest = tags.filter(t=>!primary.includes(t));
   root.className = "tagTabs compactOnly";
   root.innerHTML = `<button class="tagTab${tagFilter==="all"?" active":""}" onclick="setTagFilter('all', this)">ALL</button>` + primary.map(tagButtonHtml).join("");
@@ -11150,53 +11299,57 @@ function renderTagTabs(){
 
 function renderCards(){
   renderTagTabs();
-  const searchEl=document.getElementById("search");
-  const q=(searchEl ? searchEl.value : "").trim().toLowerCase();
   const root=document.getElementById("cards");
   if(!root) return;
-  root.innerHTML="";
-  getCurrentCharacterCards()
-    .filter(c=>!["ironclad","silent","regent"].includes(currentCharacter) || c.character === currentCharacter)
-    .filter(c=>typeFilter==="all" || c.type===typeFilter)
-    .filter(c=>rarityFilter==="all" || normalizeRarity(c.rarity)===rarityFilter)
-    .filter(c=>tagFilter==="all" || (c.tags||[]).includes(tagFilter))
-    .filter(c=>{
-      const tagText=(c.tags||[]).join(" ").toLowerCase();
-      return !q || c.nameJa.toLowerCase().includes(q)||c.nameEn.toLowerCase().includes(q)||c.id.toLowerCase().includes(q)||tagText.includes(q);
-    })
-    .forEach(c=>{
-      const target = editTarget==="deck" ? deck : nextPicks;
-      const div=document.createElement("div");
-      const rarity = normalizeRarity(c.rarity);
-      div.className=`cardItem rarity-${rarity}`;
-      div.innerHTML=`
-        <div class="cardTop">
-          <div class="name">${c.nameJa}<small>${c.nameEn}</small></div>
-          <div class="cardMeta">
-            <div class="cost">${cardCostLabel(c)}</div>
-            ${c.specialCalc?.length ? '<div class="calcBadge">特殊</div>' : ''}
-            <div class="rarityBadge ${rarity}">${rarityLabel(rarity)}</div>
-          </div>
+  const visibleCards = filteredCardsForCurrentView();
+  const idsSignature = visibleCardSignature(visibleCards);
+  const targetSignature = deckSignature(editTarget==="deck" ? deck : nextPicks);
+  const renderSignature = `${currentCharacter}|${typeFilter}|${rarityFilter}|${tagFilter}|${document.getElementById("search")?.value || ""}|${editTarget}|${targetSignature}`;
+
+  // 表示カードの並びが変わっていない場合はDOM再生成せず、枚数だけ差分更新する。
+  if(lastCardRenderState.ids === idsSignature && root.children.length === visibleCards.length){
+    updateRenderedCardCounts();
+    lastCardRenderState.signature = renderSignature;
+    return;
+  }
+
+  const target = editTarget==="deck" ? deck : nextPicks;
+  const fragment=document.createDocumentFragment();
+  visibleCards.forEach(c=>{
+    const div=document.createElement("div");
+    const rarity = normalizeRarity(c.rarity);
+    div.className=`cardItem rarity-${rarity}`;
+    div.dataset.cardId = c.id;
+    div.innerHTML=`
+      <div class="cardTop">
+        <div class="name">${c.nameJa}<small>${c.nameEn}</small></div>
+        <div class="cardMeta">
+          <div class="cost">${cardCostLabel(c)}</div>
+          ${c.specialCalc?.length ? '<div class="calcBadge">特殊</div>' : ''}
+          <div class="rarityBadge ${rarity}">${rarityLabel(rarity)}</div>
         </div>
-        <div class="desc">${describe(c)}</div>
-        ${renderCompactCardTags(c)}
-        <div class="countRows">
-          <div class="countRow">
-            <div><div class="countLabel">通常枚数</div><div class="countNum">${countIn(target,c.id,false,false)}枚</div></div>
-            <div class="btns"><button class="smallBtn" onclick="removeCard('${c.id}',false,false)">−</button><button class="smallBtn plus" onclick="addCard('${c.id}',false,false)">＋</button></div>
-          </div>
-          <div class="countRow upgradeBox">
-            <div><div class="countLabel">強化枚数</div><div class="countNum">${countIn(target,c.id,true,false)}枚</div></div>
-            <div class="btns"><button class="smallBtn" onclick="removeCard('${c.id}',true,false)">−</button><button class="smallBtn plus up" onclick="addCard('${c.id}',true,false)">＋</button></div>
-          </div>
-          <div class="countRow enchantBox">
-            <div><div class="countLabel">エンチャント</div><div class="countNum">${countIn(target,c.id,false,true)}枚</div></div>
-            <div class="btns"><button class="smallBtn" onclick="removeCard('${c.id}',false,true)">−</button><button class="smallBtn plus" onclick="addCard('${c.id}',false,true)">＋</button></div>
-          </div>
+      </div>
+      <div class="desc">${describe(c)}</div>
+      ${renderCompactCardTags(c)}
+      <div class="countRows">
+        <div class="countRow">
+          <div><div class="countLabel">通常枚数</div><div class="countNum" data-count-kind="normal">${countIn(target,c.id,false,false)}枚</div></div>
+          <div class="btns"><button class="smallBtn" onclick="removeCard('${c.id}',false,false)">−</button><button class="smallBtn plus" onclick="addCard('${c.id}',false,false)">＋</button></div>
         </div>
-      `;
-      root.appendChild(div);
-    });
+        <div class="countRow upgradeBox">
+          <div><div class="countLabel">強化枚数</div><div class="countNum" data-count-kind="upgraded">${countIn(target,c.id,true,false)}枚</div></div>
+          <div class="btns"><button class="smallBtn" onclick="removeCard('${c.id}',true,false)">−</button><button class="smallBtn plus up" onclick="addCard('${c.id}',true,false)">＋</button></div>
+        </div>
+        <div class="countRow enchantBox">
+          <div><div class="countLabel">エンチャント</div><div class="countNum" data-count-kind="enchanted">${countIn(target,c.id,false,true)}枚</div></div>
+          <div class="btns"><button class="smallBtn" onclick="removeCard('${c.id}',false,true)">−</button><button class="smallBtn plus" onclick="addCard('${c.id}',false,true)">＋</button></div>
+        </div>
+      </div>
+    `;
+    fragment.appendChild(div);
+  });
+  root.replaceChildren(fragment);
+  lastCardRenderState = { signature:renderSignature, ids:idsSignature };
 }
 function renderList(rootId,list){
   const root=document.getElementById(rootId); root.innerHTML="";
@@ -11648,12 +11801,12 @@ function scoreReasonData(deckList){
   const cards = deckList.map(getCard);
   const draw = cards.filter(c=>c.draw).length;
   const zero = cards.filter(c=>c.cost===0).length;
-  const exhaust = cards.filter(c=>c.exhaust||c.exhaustHand||c.exhaustNonAttack||c.tags?.includes("廃棄")).length;
-  const energy = cards.filter(c=>c.energyGain || c.tags?.includes("エナジー")).length;
+  const exhaust = cards.filter(c=>c.exhaust||c.exhaustHand||c.exhaustNonAttack||hasTagFast(c,"廃棄")).length;
+  const energy = cards.filter(c=>c.energyGain || hasTagFast(c,"エナジー")).length;
   const high = cards.filter(c=>c.cost>=2).length;
-  const strength = cards.filter(c=>c.strength || c.tags?.includes("筋力")).length;
+  const strength = cards.filter(c=>c.strength || hasTagFast(c,"筋力")).length;
   const powers = cards.filter(c=>c.type==="power").length;
-  const long = cards.filter(c=>c.tags?.includes("スケーリング") || c.tags?.includes("長期スケーリング") || c.specialCalc?.includes("rampageScaling") || c.specialCalc?.includes("playRandomAttackEndTurn")).length;
+  const long = cards.filter(c=>hasTagFast(c,"スケーリング") || hasTagFast(c,"長期スケーリング") || c.specialCalc?.includes("rampageScaling") || c.specialCalc?.includes("playRandomAttackEndTurn")).length;
   return {draw,zero,exhaust,energy,high,strength,powers,long,avgCost:avgCost(deckList)};
 }
 function renderScoreReasons(){
@@ -11779,12 +11932,12 @@ function evaluatePick(a){
     if(rotationDelta>0){ score += Math.min(10, rotationDelta); reasons.push(`デッキ回転が +${rotationDelta}%`); }
     if(scalingDelta>0){ score += Math.min(14, scalingDelta); reasons.push(`長期スケーリングが +${scalingDelta}%`); }
 
-    if(missing.includes("フロントロード") && c.tags?.includes("フロントロード")){score+=16;reasons.push("不足しているフロントロードを補える");}
-    if(missing.includes("ドロー") && c.tags?.includes("ドロー")){score+=16;reasons.push("ドロー不足を補える");}
-    if(missing.includes("防御") && c.tags?.includes("防御")){score+=14;reasons.push("防御面を補える");}
-    if(missing.includes("AoE") && c.tags?.includes("AoE")){score+=14;reasons.push("AoE不足を補える");}
-    if(c.tags?.includes("筋力")){score+=8;reasons.push("筋力で長期戦の火力が伸びる");}
-    if(c.tags?.includes("廃棄")){score+=6;reasons.push("廃棄シナジーに関与する");}
+    if(missing.includes("フロントロード") && hasTagFast(c,"フロントロード")){score+=16;reasons.push("不足しているフロントロードを補える");}
+    if(missing.includes("ドロー") && hasTagFast(c,"ドロー")){score+=16;reasons.push("ドロー不足を補える");}
+    if(missing.includes("防御") && hasTagFast(c,"防御")){score+=14;reasons.push("防御面を補える");}
+    if(missing.includes("AoE") && hasTagFast(c,"AoE")){score+=14;reasons.push("AoE不足を補える");}
+    if(hasTagFast(c,"筋力")){score+=8;reasons.push("筋力で長期戦の火力が伸びる");}
+    if(hasTagFast(c,"廃棄")){score+=6;reasons.push("廃棄シナジーに関与する");}
 
     if(c.id==="strike" || c.id==="defend"){
       score-=22;
@@ -12040,7 +12193,14 @@ function renderCurrentCharacterBadges(){
   });
 }
 
-function renderAll(){renderHeroSelector();renderCharacters();renderCurrentCharacterBadges();renderCards();renderAnalysis();renderMissingCards();}
+function renderAll(){
+  renderHeroSelector();
+  renderCharacters();
+  renderCurrentCharacterBadges();
+  if(!document.getElementById("view-carddb")?.classList.contains("hidden")) renderCards();
+  renderAnalysis();
+  renderMissingCards();
+}
 function deckToCode(){
   const map=new Map();
   deck.forEach(x=>{const key=x.id+(x.upgraded?"+":"")+(x.enchanted?"@enchant":"");map.set(key,(map.get(key)||0)+1);});
@@ -12057,7 +12217,7 @@ function loadDeckCode(){
     const found=CARD_DB.find(c=>c.id===id||c.nameJa===id||c.nameEn.toLowerCase()===id.toLowerCase());
     if(found) for(let i=0;i<n;i++) next.push({id:found.id,upgraded:up,enchanted});
   });
-  if(next.length){deck=next; currentHero=inferHeroFromDeck(deck); currentCharacter=currentHero; renderAll();}
+  if(next.length){deck=next; currentHero=inferHeroFromDeck(deck); currentCharacter=currentHero; refreshAfterCharacterChange();}
 }
 
 function hashtagFromDiagnosis(name){
@@ -13557,6 +13717,234 @@ const SILENT_PHASE1_CARDS = [
   {id:"die_die_die",name:"Die Die Die",hero:"silent",type:"Attack",rarity:"Rare",cost:1,tags:["AoE","フロントロード","フィニッシャー"]},
 ];
 
+</script>
+
+
+
+<script>
+/* impl19-v2-display-value-safety-fix
+   UI出力直前の表示値整形のみ。分析結果オブジェクト本体・重み・スコア・カードDBは変更しない。 */
+(function(){
+  function isBlankText(s){
+    return s === '' || s === 'undefined' || s === 'null' || s === '[object Object]' || /^\[object Object\](\s*[\/・,、。]\s*\[object Object\])*$/.test(s);
+  }
+  function displayValue(value, fallback, seen){
+    const fb = fallback || '未確定';
+    if(value === null || value === undefined) return fb;
+    const t = typeof value;
+    if(t === 'string'){
+      const s = value.trim();
+      return isBlankText(s) ? fb : s;
+    }
+    if(t === 'number') return Number.isFinite(value) ? String(value) : fb;
+    if(t === 'boolean') return value ? 'あり' : 'なし';
+    if(Array.isArray(value)){
+      const arr = value.map(v => displayValue(v, '', seen)).map(v => String(v||'').trim()).filter(v => v && !isBlankText(v));
+      return arr.length ? arr.join(' / ') : fb;
+    }
+    if(t === 'object'){
+      seen = seen || new WeakSet();
+      if(seen.has(value)) return fb;
+      seen.add(value);
+      const keys = ['name','nameJa','label','axis','title','id','type'];
+      for(const k of keys){
+        if(Object.prototype.hasOwnProperty.call(value, k)){
+          const s = displayValue(value[k], '', seen);
+          if(s && !isBlankText(String(s))) return s;
+        }
+      }
+      if(value.state && typeof value.state === 'object'){
+        const s = displayValue(value.state, '', seen);
+        if(s && !isBlankText(String(s))) return s;
+      }
+      return fb;
+    }
+    const s = String(value).trim();
+    return isBlankText(s) ? fb : s;
+  }
+  function displayList(value, fallback){
+    return displayValue(value, fallback || 'なし');
+  }
+  function escDisplay(value, fallback){
+    const s = displayValue(value, fallback || '未確定');
+    return String(s).replace(/[&<>"']/g, function(ch){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
+    });
+  }
+  function stateClass(status){
+    const s = displayValue(status, '未成立');
+    if(/成立$|十分|安定|ok/i.test(s) && !/未成立/.test(s)) return 'ok';
+    if(/途中|注意|弱い|不足|mid|warn/i.test(s)) return 'mid';
+    if(/weak/i.test(s)) return 'weak';
+    return 'bad';
+  }
+  function getWinName(a){
+    const wc = a && a.winCondition || {};
+    return displayValue(wc.mainAxis || wc.name || a?.diagnosis?.name, '成立途中');
+  }
+  function getSubAxes(a){
+    const wc = a && a.winCondition || {};
+    const raw = Array.isArray(wc.subAxes) ? wc.subAxes : (Array.isArray(wc.axes) ? wc.axes.slice(1,3) : []);
+    return raw.map(x => displayValue(x, '')).filter(Boolean).slice(0,3);
+  }
+  function safeReasons(list, fallback){
+    if(!Array.isArray(list)) return fallback || '確認中です。';
+    const out = list.map(x => displayValue(x, '')).filter(Boolean);
+    return out.length ? out.join('。') + '。' : (fallback || '確認中です。');
+  }
+  function renderSafeConnectedWinValidation(validation){
+    if(!validation) return '';
+    if(validation.preparing){
+      return '<div class="winStructurePanel"><div class="winStructureTitle">勝ち筋分類</div><div class="winStructureLead">' + escDisplay(validation.conclusion, '勝ち筋の成立状況を確認します。') + '</div></div>';
+    }
+    const rows = (Array.isArray(validation.axes) ? validation.axes : []).map(function(axis){
+      const st = (typeof winConditionState === 'function') ? winConditionState(Number(axis && axis.score) || 0) : {cls:stateClass(axis && axis.status), label:displayValue(axis && axis.status, '未成立')};
+      const axisName = displayValue(axis && axis.name || axis, '未判定');
+      const summary = validation.character === 'silent' && typeof compactSilentSummary === 'function'
+        ? displayValue(compactSilentSummary(axis), 'この軸の成立状況を確認します。')
+        : (typeof nonSilentWinAxisDescription === 'function'
+          ? displayValue(nonSilentWinAxisDescription(axisName, axis && (axis.summary || axis.reason)), 'この軸の成立状況を確認します。')
+          : displayValue(axis && (axis.summary || axis.reason), 'この軸の成立状況を確認します。'));
+      const needs = (Array.isArray(axis && axis.needs) && axis.needs.length ? axis.needs : ['大きな不足なし']).slice(0,2);
+      return '<div class="winAxisCard ' + st.cls + '"><div class="winAxisHead"><div class="winAxisName">' + escDisplay(axisName, '未判定') + '</div><div class="winAxisStatus ' + st.cls + '">' + escDisplay(st.label, '未成立') + '</div></div><div class="winAxisSummary">' + escDisplay(summary, '確認中です。') + '</div><div class="winAxisTags">' + needs.map(function(n,i){ return '<span class="winAxisTag ' + (i===0 && axis && axis.needs && axis.needs.length ? 'priority' : '') + '">' + escDisplay(n, 'なし') + '</span>'; }).join('') + '</div></div>';
+    }).join('');
+    const support = typeof renderSupportBars === 'function' ? renderSupportBars(validation.supportMetrics || []) : '';
+    return '<div class="winStructurePanel"><div class="winStructureTitle">勝ち筋分類</div><div class="winStructureLead">' + escDisplay(validation.conclusion, '勝ち筋と補助性能を確認します。') + '</div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">勝ち筋</div><div class="winSectionHint">何で勝つデッキか</div></div><div class="winAxisGrid">' + rows + '</div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">補助性能</div><div class="winSectionHint">勝ち筋を支える能力</div></div><div class="supportList">' + support + '</div></div><div class="winStructureNote">ドロー・圧縮・エナジー・防御・AoEは勝ち筋ではなく、勝ち筋を支える補助性能として分離しています。</div></div>';
+  }
+  function renderSafeWinSupportCard(a){
+    if(!a && typeof analyzeDeck === 'function') a = analyzeDeck(deck);
+    if(!a) return '';
+    const wc = a.winCondition || {};
+    const reasons = a.characterWinValidation ? '勝ち筋と補助性能を分けて整理します。' : safeReasons(wc.reasons, '勝ち筋の成立状況を確認します。');
+    return '<div class="advancedInsightCard winConditionFullCard" data-win-support-connected="true" data-display-safe="true" data-deck-size="' + Number(a.deckSize || 0) + '"><div class="advancedInsightTitle">勝ち筋分類</div><div class="advancedInsightValue">' + escDisplay(wc.name || wc.mainAxis || a.diagnosis?.name, '未判定') + '</div><div class="advancedInsightText">' + escDisplay(reasons, '確認中です。') + '</div>' + (a.characterWinValidation ? '' : (typeof renderSilentAxisDetails === 'function' ? renderSilentAxisDetails(wc) : '')) + renderSafeConnectedWinValidation(a.characterWinValidation) + (typeof renderSilentFlowAnalysis === 'function' ? renderSilentFlowAnalysis(a.silentFlow) : '') + '</div>';
+  }
+  function connectSafeWinSupportDisplay(a){
+    const root = document.getElementById('advancedInsights');
+    if(!root || typeof analyzeDeck !== 'function') return;
+    const fresh = a || analyzeDeck(deck);
+    root.querySelectorAll('.winConditionFullCard').forEach(function(el){ el.remove(); });
+    root.insertAdjacentHTML('beforeend', renderSafeWinSupportCard(fresh));
+  }
+  function updateHeroWin(a){
+    const el = document.getElementById('heroWinCondition');
+    if(!el) return;
+    const score = Math.max(0, Math.min(100, Math.round(Number(a?.winCondition?.completion ?? a?.actEvaluation?.score) || 0)));
+    const sub = getSubAxes(a);
+    el.innerHTML = '<div>主軸：' + escDisplay(getWinName(a), '成立途中') + '</div><div class="heroWinSub">サブ：' + escDisplay(sub.length ? sub : '未確定', '未確定') + '</div>';
+    const stateEl = document.getElementById('heroCompletionState');
+    if(stateEl) stateEl.textContent = '状態：' + displayValue(a?.winCondition?.state, (score >= 58 ? '成立途中' : '未完成'));
+  }
+  function repairSharePreview(a){
+    const el = document.getElementById('sharePreview');
+    if(!el || typeof makeShareUrl !== 'function') return;
+    try{
+      const fresh = a || (typeof analyzeDeck === 'function' ? analyzeDeck(deck) : null);
+      if(!fresh) return;
+      const topLine = '今のデッキは「' + displayValue(fresh.diagnosis?.name, '未確定') + '」';
+      const sub = displayValue(fresh.actEvaluation?.label, 'Act') + '総合 ' + displayValue(fresh.actEvaluation?.score, '0') + '% / 勝ち筋 ' + displayValue(fresh.winCondition?.name || fresh.winCondition?.mainAxis, '未判定') + ' / 事故率 ' + (typeof pct === 'function' ? pct(fresh.handBrickRate) : displayValue(fresh.handBrickRate, '0')) + ' / 回転 ' + displayValue(fresh.deckRotationScore, '0') + '%';
+      const missing = '不足要素：' + displayList(fresh.diagnosis?.missing, 'なし');
+      const hashtags = typeof makeShareHashtags === 'function' ? displayValue(makeShareHashtags(fresh), '') : '';
+      el.textContent = 'STS2 デッキアナライザー\n' + topLine + '\n' + sub + '\n' + missing + '\n' + hashtags + '\n\n' + makeShareUrl();
+    }catch(e){}
+  }
+  function sanitizeTextNodes(root){
+    root = root || document.body;
+    if(!root || !document.createTreeWalker) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const targets = [];
+    while(walker.nextNode()){
+      const n = walker.currentNode;
+      if(/\[object Object\]|\bundefined\b|\bnull\b/.test(n.nodeValue || '')) targets.push(n);
+    }
+    targets.forEach(function(n){
+      let s = n.nodeValue || '';
+      s = s.replace(/\[object Object\]/g, '未確定').replace(/\bundefined\b/g, '未確定').replace(/\bnull\b/g, 'なし');
+      n.nodeValue = s;
+    });
+  }
+  function repairDisplay(a){
+    try{
+      const fresh = a || (typeof analyzeDeck === 'function' ? analyzeDeck(deck) : null);
+      updateHeroWin(fresh);
+      connectSafeWinSupportDisplay(fresh);
+      repairSharePreview(fresh);
+      sanitizeTextNodes(document.body);
+    }catch(e){
+      try{ sanitizeTextNodes(document.body); }catch(_e){}
+    }
+  }
+
+  window.displayValue = displayValue;
+  window.displayList = displayList;
+  window.escDisplay = escDisplay;
+
+  const oldMakeShareText = window.makeShareText;
+  window.makeShareText = function(){
+    try{
+      const a = analyzeDeck(deck);
+      const topLine = '今のデッキは「' + displayValue(a.diagnosis?.name, '未確定') + '」';
+      const sub = displayValue(a.actEvaluation?.label, 'Act') + '総合 ' + displayValue(a.actEvaluation?.score, '0') + '% / 勝ち筋 ' + displayValue(a.winCondition?.name || a.winCondition?.mainAxis, '未判定') + ' / 事故率 ' + (typeof pct === 'function' ? pct(a.handBrickRate) : displayValue(a.handBrickRate, '0')) + ' / 回転 ' + displayValue(a.deckRotationScore, '0') + '%';
+      const missing = '不足要素：' + displayList(a.diagnosis?.missing, 'なし');
+      const hashtags = typeof makeShareHashtags === 'function' ? displayValue(makeShareHashtags(a), '') : '';
+      return 'STS2 デッキアナライザー\n' + topLine + '\n' + sub + '\n' + missing + '\n' + hashtags + '\n';
+    }catch(e){
+      return oldMakeShareText ? oldMakeShareText() : 'STS2 デッキアナライザー\n';
+    }
+  };
+
+  const oldRenderSharePreview = window.renderSharePreview;
+  window.renderSharePreview = function(){
+    if(oldRenderSharePreview) oldRenderSharePreview.apply(this, arguments);
+    repairSharePreview();
+  };
+
+  const oldRenderAdvancedInsights = window.renderAdvancedInsights;
+  if(typeof oldRenderAdvancedInsights === 'function'){
+    window.renderAdvancedInsights = renderAdvancedInsights = function(a){
+      oldRenderAdvancedInsights.call(this, a);
+      connectSafeWinSupportDisplay(a);
+      sanitizeTextNodes(document.getElementById('advancedInsights') || document.body);
+    };
+  }
+
+  const oldRenderPriorityFocus = window.renderPriorityFocus;
+  if(typeof oldRenderPriorityFocus === 'function'){
+    window.renderPriorityFocus = renderPriorityFocus = function(a){
+      oldRenderPriorityFocus.call(this, a);
+      updateHeroWin(a);
+      sanitizeTextNodes(document.getElementById('heroWinCondition') || document.body);
+    };
+  }
+
+  const oldRenderAnalysis = window.renderAnalysis;
+  if(typeof oldRenderAnalysis === 'function'){
+    window.renderAnalysis = renderAnalysis = function(){
+      oldRenderAnalysis.apply(this, arguments);
+      repairDisplay();
+    };
+  }
+
+  const oldRenderAll = window.renderAll;
+  if(typeof oldRenderAll === 'function'){
+    window.renderAll = renderAll = function(){
+      oldRenderAll.apply(this, arguments);
+      repairDisplay();
+    };
+  }
+
+  ['addCard','removeCard','setHero','setCharacter','resetDeck','resetStarterDeck','loadDeckCode','loadDeckCodeFromDiagnosis','clearNextPicks'].forEach(function(name){
+    const old = window[name];
+    if(typeof old !== 'function') return;
+    window[name] = function(){
+      const result = old.apply(this, arguments);
+      setTimeout(function(){ repairDisplay(); }, 0);
+      return result;
+    };
+  });
+
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ repairDisplay(); }, 0); });
+  setTimeout(function(){ repairDisplay(); }, 80);
+})();
 </script>
 
 </body>
