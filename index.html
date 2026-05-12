@@ -5745,6 +5745,7 @@ header{padding:24px 26px;border-radius:28px;}
 </style>
 <!-- fixed-common-cards-added -->
 <!-- implementation17-win-condition-layout-unify-v1 -->
+<!-- implementation19-v3-ui-minor-fixes -->
 </head>
 <body>
 <div class="wrap">
@@ -5786,6 +5787,9 @@ header{padding:24px 26px;border-radius:28px;}
       <div id="currentCharacterBadgeDiagnosis" class="currentCharacterBadgeBox"></div>
       <div id="deckListDiagnosis" class="deckList"></div>
       <div id="deckMetaDiagnosis" class="cardDbDeckMeta"></div>
+      <div id="deckStructureMiniDiagnosis" class="deckStructureMini">
+        <span class="deckStructureChip">構成確認中</span>
+      </div>
       <div class="impl4DeckActions">
         <button onclick="resetDeck()">初期デッキ</button>
         <button onclick="showAppTab('carddb', document.querySelectorAll('.appTabBtn')[1])">カード一覧で編集</button>
@@ -5866,6 +5870,14 @@ header{padding:24px 26px;border-radius:28px;}
             <div class="priorityKicker">最初に見るべき結論</div>
             <div id="priorityHeadline" class="priorityHeadline">このデッキの問題点を分析中です。</div>
             <div id="prioritySub" class="prioritySub">グラフで全体像を見て、総評と不足要素で次の課題を確認します。</div>
+          </div>
+          <div class="actSelector" id="actSelectorFirstView">
+            <div class="actSelectorTitle">1stビュー Act切替</div>
+            <div class="actTabs">
+              <button class="actTab active" data-act="act1" onclick="setAct('act1', this)">Act1</button>
+              <button class="actTab" data-act="act2" onclick="setAct('act2', this)">Act2</button>
+              <button class="actTab" data-act="act3" onclick="setAct('act3', this)">Act3</button>
+            </div>
           </div>
           <div class="deckTypeCompact">
             <div class="aiLead">デッキタイプ</div>
@@ -9793,7 +9805,10 @@ function syncCharacterTabButtons(rootId, buttonClass, activeId){
     b.textContent = hero.nameJa || hero.name;
     b.disabled = pending;
     b.title = pending ? "準備中" : "";
-    b.onclick = pending ? null : (()=>setHero(hero.id,true));
+    b.onclick = pending ? null : (()=>{
+      if(rootId === "characterTabs") setCardListCharacter(hero.id);
+      else setHero(hero.id,true);
+    });
   });
 }
 
@@ -11191,6 +11206,20 @@ function setHero(heroId, reset=true){
   }
   refreshAfterCharacterChange();
 }
+function setCardListCharacter(heroId){
+  if(!isCharacterImplemented(heroId)) return;
+  currentCharacter = heroId;
+  typeFilter = "all";
+  rarityFilter = "all";
+  tagFilter = "all";
+  lastTagTabsSignature = "";
+  lastCardRenderState = { signature:"", ids:"" };
+  document.querySelectorAll(".typeTab").forEach((b,i)=>b.classList.toggle("active",i===0));
+  document.querySelectorAll(".rarityTab").forEach((b,i)=>b.classList.toggle("active",i===0));
+  renderCharacters();
+  renderCurrentCharacterBadges();
+  renderCards();
+}
 function resetStarterDeck(){
   deck = cloneStarterDeck(currentHero);
   nextPicks = [];
@@ -12103,23 +12132,7 @@ function renderAnalysis(){
   if (metaEl) metaEl.textContent = metaText;
   const sidebarMetaEl = document.getElementById("deckMetaSidebar");
   if (sidebarMetaEl) sidebarMetaEl.textContent = metaText;
-  const structureMini = document.getElementById("deckStructureMini");
-  if(structureMini){
-    const cards = deck.map(getCard);
-    const attack = cards.filter(c=>c.type==="attack").length;
-    const skill = cards.filter(c=>c.type==="skill").length;
-    const power = cards.filter(c=>c.type==="power").length;
-    const avgCost = cards.length ? cards.reduce((s,c)=>s+(Number(c.cost)||0),0)/cards.length : 0;
-    const danger = (a.deficiencyTags || []).filter(t=>t.level!=="ok").slice(0,2).map(t=>t.name);
-    const chips = [
-      `攻撃${attack}`,
-      `スキル${skill}`,
-      `パワー${power}`,
-      avgCost>=1.55 ? `重い ${avgCost.toFixed(1)}` : `平均${avgCost.toFixed(1)}`,
-      ...danger
-    ];
-    structureMini.innerHTML = chips.map(x=>`<span class="deckStructureChip">${x}</span>`).join("");
-  }
+  renderDeckComposition();
   renderDiagnosis(a);
   document.getElementById("damageMetrics").innerHTML=metricHTML([["1T最大打点",a.oneTurnMaxDamage],["平均打点",num(a.avgDamage)],["攻撃事故率",pct(a.attackBrickRate)],["デッキ回転",a.deckRotationScore+"%",true],["長期スケーリング",a.longScalingScore+"%",true]]);
   document.getElementById("blockMetrics").innerHTML=metricHTML([["1T最大防御",a.oneTurnMaxBlock],["平均ブロック",num(a.avgBlock)],["総合手札事故率",pct(a.handBrickRate)],["防御事故率",pct(a.defenseBrickRate)],["エナジー負荷",a.energyLoadScore+"%",true],["エナジー事故率",pct(a.energyBrickRate)]]);
@@ -12182,15 +12195,44 @@ function renderMissingCards(){
   }
 }
 
-function renderCurrentCharacterBadges(){
-  const data = characterDataById(currentCharacter);
-  const deckCharacter = heroById(inferHeroFromDeck(deck));
-  const statusText = data.status === "implemented" ? "分析対応中" : "準備中：本格分析は未実装";
-  const html = `現在のキャラクター：${escapeHtml(data.name)}<small>${escapeHtml(statusText)} / デッキ推定：${escapeHtml(deckCharacter.nameJa || deckCharacter.name)}</small>`;
-  ["currentCharacterBadgeDiagnosis", "currentCharacterBadgeCardDb"].forEach(id=>{
+function deckCompositionCounts(deckList=deck){
+  const counts = { attack:0, skill:0, power:0, curse:0, status:0, other:0 };
+  deckList.map(getCard).forEach(c=>{
+    if(c.character === "curse" || c.type === "curse" || hasTagFast(c,"呪い")) counts.curse++;
+    else if(c.character === "status" || c.type === "status" || hasTagFast(c,"状態異常")) counts.status++;
+    else if(c.type === "attack") counts.attack++;
+    else if(c.type === "skill") counts.skill++;
+    else if(c.type === "power") counts.power++;
+    else counts.other++;
+  });
+  return counts;
+}
+function renderDeckComposition(){
+  const counts = deckCompositionCounts(deck);
+  const labels = [
+    ["attack","アタック"], ["skill","スキル"], ["power","パワー"],
+    ["curse","呪い"], ["status","状態異常"], ["other","その他"]
+  ];
+  const html = labels.map(([key,label])=>`<span class="deckStructureChip">${label}：${counts[key]}枚</span>`).join("");
+  ["deckStructureMiniDiagnosis", "deckStructureMini"].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.innerHTML = html;
   });
+}
+function renderCurrentCharacterBadges(){
+  const deckCharacter = heroById(inferHeroFromDeck(deck));
+  const analysisCharacter = heroById(currentHero);
+  const listCharacter = characterDataById(currentCharacter);
+  const deckName = deckCharacter.nameJa || deckCharacter.name;
+  const analysisName = analysisCharacter.nameJa || analysisCharacter.name;
+  const listName = listCharacter.name || currentCharacter;
+  const baseHtml = `現在のデッキ：${escapeHtml(deckName)}<small>分析中デッキ：${escapeHtml(analysisName)}</small>`;
+  const listNote = currentCharacter !== currentHero ? `<small>表示中カード：${escapeHtml(listName)}</small>` : "";
+  const diagnosisEl = document.getElementById("currentCharacterBadgeDiagnosis");
+  if(diagnosisEl) diagnosisEl.innerHTML = baseHtml;
+  const cardDbEl = document.getElementById("currentCharacterBadgeCardDb");
+  if(cardDbEl) cardDbEl.innerHTML = baseHtml + listNote;
+  renderDeckComposition();
 }
 
 function renderAll(){
