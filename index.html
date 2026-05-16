@@ -12291,11 +12291,13 @@ function showAppTab(tab, btn){
   if(activeTab === "carddb"){ renderCards(); updateFilterPendingNotice(); }
 }
 function addCard(id, upgraded=false, enchanted=false){
+  if(typeof window.markDemoDeckEdited === "function") window.markDemoDeckEdited();
   const target = editTarget === "deck" ? deck : nextPicks;
   target.push({id, upgraded, enchanted});
   refreshAfterDeckMutation();
 }
 function removeCard(id, upgraded=false, enchanted=false){
+  if(typeof window.markDemoDeckEdited === "function") window.markDemoDeckEdited();
   const target = editTarget === "deck" ? deck : nextPicks;
   const idx = target.map(x=>x.id===id && x.upgraded===upgraded && !!x.enchanted===!!enchanted).lastIndexOf(true);
   if (idx >= 0){
@@ -22042,6 +22044,7 @@ const SILENT_PHASE1_CARDS = [
   }
   var prevSetHighAsc = window.setHighAscBaneMode;
   window.setHighAscBaneMode = setHighAscBaneMode = function(on){
+    if(typeof window.markDemoDeckEdited === 'function') window.markDemoDeckEdited();
     var list = arr(window.deck || deck);
     if(on){
       if(!list.some(isBane)) list.push({id:'curse_ascenders_bane', upgraded:false, enchanted:false});
@@ -22288,6 +22291,83 @@ const SILENT_PHASE1_CARDS = [
     var view = document.getElementById('view-carddb');
     return view && !view.classList.contains('hidden');
   }
+  function buildInitialDemoDeck(){
+    var spec = [
+      ['strike',2], ['defend',2], ['bash',1], ['curse_ascenders_bane',1],
+      ['corruption',1], ['feel_no_pain',1], ['fiend_fire',1], ['second_wind',1],
+      ['offering',1], ['shrug',2], ['flame_barrier',1], ['barricade',1],
+      ['body_slam',1], ['pommel_strike',1], ['headbutt',1], ['whirlwind',1], ['thunderclap',1]
+    ];
+    var out = [];
+    spec.forEach(function(pair){
+      for(var i=0;i<pair[1];i++) out.push({id:pair[0], upgraded:false, enchanted:false});
+    });
+    return out;
+  }
+  function demoDeckSignature(list){
+    return arr(list).map(function(x){
+      return String((x && x.id) || x || '') + ':' + (!!(x && x.upgraded)) + ':' + (!!(x && x.enchanted));
+    }).join('|');
+  }
+  function starterDeckSignature(heroId){
+    return demoDeckSignature((typeof STARTER_DECKS !== 'undefined' && STARTER_DECKS[heroId]) ? STARTER_DECKS[heroId] : []);
+  }
+  function hasIncomingDeckData(){
+    try{ if(new URLSearchParams(location.search).has('deck')) return true; }catch(e){}
+    try{
+      var main = document.getElementById('deckCode');
+      var diag = document.getElementById('deckCodeDiagnosis');
+      if(String((main && main.value) || '').trim()) return true;
+      if(String((diag && diag.value) || '').trim()) return true;
+    }catch(e){}
+    return !!window.__sts2LoadedDeckCode;
+  }
+  function hasStoredDeckData(){
+    try{
+      if(!window.localStorage) return false;
+      for(var i=0;i<localStorage.length;i++){
+        var key = String(localStorage.key(i) || '');
+        var low = key.toLowerCase();
+        if(low.indexOf('sts2') >= 0 && low.indexOf('deck') >= 0 && String(localStorage.getItem(key) || '').trim()) return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  function isUntouchedOpeningDeck(){
+    var list = arr(window.deck || deck);
+    if(!list.length) return true;
+    return demoDeckSignature(list) === starterDeckSignature(activeCharacter());
+  }
+  window.markDemoDeckEdited = function(){
+    if(window.__sts2ApplyingInitialDemo) return;
+    if(window.__sts2DemoDeckActive) window.__sts2DemoDeckActive = false;
+    window.__sts2DemoDeckDismissed = true;
+  };
+  function applyInitialDemoDeck(){
+    if(window.__sts2DemoDeckApplied || window.__sts2DemoDeckDismissed) return;
+    if(hasIncomingDeckData() || hasStoredDeckData()) return;
+    if(!isUntouchedOpeningDeck()) return;
+    window.__sts2ApplyingInitialDemo = true;
+    try{
+      if(typeof setGlobals === 'function') setGlobals('ironclad');
+      else{
+        window.currentHero = currentHero = 'ironclad';
+        window.currentCharacter = currentCharacter = 'ironclad';
+      }
+      deck = buildInitialDemoDeck();
+      window.deck = deck;
+      nextPicks = [];
+      window.nextPicks = nextPicks;
+      window.__sts2DemoDeckActive = true;
+      window.__sts2DemoDeckApplied = true;
+    }finally{
+      window.__sts2ApplyingInitialDemo = false;
+    }
+  }
+  function demoDeckMetaText(baseText){
+    if(!window.__sts2DemoDeckActive) return baseText;
+    return baseText + '｜完成寄りサンプルデッキです。カードを追加・削除して自分のデッキに変更できます。';
+  }
   function lightRefresh(characterChanged, includeCardList){
     try{ if(typeof invalidateAnalysisCache === 'function') invalidateAnalysisCache(); }catch(e){}
     try{ ensureBaneUnique(); syncBaneToggle(); }catch(e){}
@@ -22302,7 +22382,7 @@ const SILENT_PHASE1_CARDS = [
       var deckCountCardDb = document.getElementById('deckCountBadgeCardDb');
       if(deckCount) deckCount.textContent = currentDeckSize + '枚';
       if(deckCountCardDb) deckCountCardDb.textContent = currentDeckSize + '枚';
-      var fallbackMeta = 'デッキ枚数: ' + currentDeckSize;
+      var fallbackMeta = demoDeckMetaText('デッキ枚数: ' + currentDeckSize);
       var deckMetaDiagnosis = document.getElementById('deckMetaDiagnosis');
       var deckMetaSidebar = document.getElementById('deckMetaSidebar');
       if(deckMetaDiagnosis) deckMetaDiagnosis.textContent = fallbackMeta;
@@ -22319,6 +22399,7 @@ const SILENT_PHASE1_CARDS = [
     if(reset === undefined) reset = true;
     if(!implemented(heroId)) return;
     if(rendering){ queuedHero = heroId; queuedHeroReset = reset; return; }
+    if(typeof window.markDemoDeckEdited === 'function') window.markDemoDeckEdited();
     setGlobals(heroId);
     resetFilters();
     if(reset){
@@ -22348,6 +22429,7 @@ const SILENT_PHASE1_CARDS = [
   window.refreshAfterCharacterChange = refreshAfterCharacterChange = function(){ lightRefresh(true, cardDbVisible()); };
   window.refreshAfterDeckMutation = refreshAfterDeckMutation = function(){ lightRefresh(false, cardDbVisible()); };
   window.resetStarterDeck = resetStarterDeck = function(){
+    if(typeof window.markDemoDeckEdited === 'function') window.markDemoDeckEdited();
     try{ deck = cloneStarterDeck(activeCharacter()); window.deck = deck; }catch(e){}
     try{ nextPicks = []; window.nextPicks = nextPicks; }catch(e){}
     lightRefresh(false, cardDbVisible());
@@ -22379,6 +22461,8 @@ const SILENT_PHASE1_CARDS = [
       for(var i=0;i<n;i++) next.push({id:found.id, upgraded:upgraded, enchanted:enchanted});
     });
     if(!next.length) return;
+    window.__sts2LoadedDeckCode = true;
+    if(typeof window.markDemoDeckEdited === 'function') window.markDemoDeckEdited();
     window.deck = deck = next;
     if(explicit) setGlobals(explicit); else setGlobals(previous);
     lightRefresh(!!explicit && explicit !== previous, cardDbVisible());
@@ -22409,6 +22493,7 @@ const SILENT_PHASE1_CARDS = [
     booting = false;
     allowInitialAnalysis = true;
     window.isInitializing = false;
+    try{ applyInitialDemoDeck(); }catch(e){ console.warn('initial demo deck skipped', e); }
     try{ ensureBaneUnique(); syncBaneToggle(); }catch(e){}
     lightRefresh(false, false);
     try{ if(typeof forceRadarRender === 'function') forceRadarRender(); }catch(e){}
