@@ -1768,8 +1768,20 @@ textarea{min-height:90px;resize:vertical}
 .winAxisHead{
   display:flex;
   justify-content:space-between;
-  align-items:center;
+  align-items:flex-start;
   gap:8px;
+}
+.winAxisTitleLine{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px 8px;
+  min-width:0;
+}
+.winAxisTagsInline{
+  display:inline-flex;
+  flex-wrap:wrap;
+  gap:5px;
 }
 .winAxisName{
   font-weight:950;
@@ -5689,6 +5701,19 @@ header{padding:24px 26px;border-radius:28px;}
   color:#9a3412;
   margin-bottom:4px;
 }
+.actDangerAnalysisHead{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px 8px;
+  margin-bottom:6px;
+}
+.actDangerAnalysisHead .actDangerAnalysisAct{
+  margin-bottom:0;
+}
+.actDangerAnalysisHead .actDangerMiniTags{
+  margin:0;
+}
 .actDangerAnalysisText{
   color:#334155;
   font-size:13px;
@@ -6297,6 +6322,18 @@ header{padding:24px 26px;border-radius:28px;}
   font-size:35px;
   line-height:1;
   box-shadow:0 12px 24px rgba(220,38,38,.20);
+}
+.priorityHero.clearCapable{
+  border-color:#bbf7d0 !important;
+  background:linear-gradient(135deg,#f0fdf4 0%,#ffffff 100%) !important;
+}
+.priorityHero.clearCapable::before{
+  content:'◎';
+  background:linear-gradient(135deg,#22c55e,#16a34a);
+  box-shadow:0 12px 24px rgba(22,163,74,.18);
+}
+.priorityHero.clearCapable .priorityHeadline{
+  color:#166534 !important;
 }
 .priorityKicker{
   grid-area:kicker;
@@ -7192,6 +7229,7 @@ header{padding:24px 26px;border-radius:28px;}
 }
 </style>
 
+<!-- impl151-win-render-path-cleanup-v1: removed obsolete win-condition render override and unused first-view current-comment source; detailed 現状コメント remains in canonical detailed render. -->
 </head>
 <body>
 <div class="wrap">
@@ -7440,27 +7478,27 @@ header{padding:24px 26px;border-radius:28px;}
         <div class="actDangerAnalysisLead">このデッキが、どのActで崩れやすいかを実戦ベースで表示します。</div>
         <div class="actDangerAnalysisRows">
           <div class="actDangerAnalysisRow">
-            <div class="actDangerAnalysisAct">Act1</div>
-            <div class="actDangerMiniTags">
-              <span class="actDangerMiniTag">序盤</span>
-              <span class="actDangerMiniTag warn">エリート</span>
-            </div>
+            <div class="actDangerAnalysisHead"><div class="actDangerAnalysisAct">Act1</div>
+              <div class="actDangerMiniTags">
+                <span class="actDangerMiniTag">序盤</span>
+                <span class="actDangerMiniTag warn">エリート</span>
+              </div></div>
             <div class="actDangerAnalysisText">初動火力が低いと、序盤雑魚やエリート戦で押し切れず被弾が増えやすいです。</div>
           </div>
           <div class="actDangerAnalysisRow">
-            <div class="actDangerAnalysisAct">Act2</div>
-            <div class="actDangerMiniTags">
-              <span class="actDangerMiniTag">横並び</span>
-              <span class="actDangerMiniTag warn">全体攻撃不足</span>
-            </div>
-            <div class="actDangerAnalysisText">全体攻撃性能や防御が薄いと、横並び戦や高火力連打でHPを削られやすいです。</div>
+            <div class="actDangerAnalysisHead"><div class="actDangerAnalysisAct">Act2</div>
+              <div class="actDangerMiniTags">
+                <span class="actDangerMiniTag">横並び</span>
+                <span class="actDangerMiniTag warn">全体攻撃不足</span>
+              </div></div>
+            <div class="actDangerAnalysisText">AoE性能や防御が薄いと、横並び戦や高火力連打でHPを削られやすいです。</div>
           </div>
           <div class="actDangerAnalysisRow">
-            <div class="actDangerAnalysisAct">Act3</div>
-            <div class="actDangerMiniTags">
-              <span class="actDangerMiniTag">長期戦</span>
-              <span class="actDangerMiniTag danger">危険</span>
-            </div>
+            <div class="actDangerAnalysisHead"><div class="actDangerAnalysisAct">Act3</div>
+              <div class="actDangerMiniTags">
+                <span class="actDangerMiniTag">長期戦</span>
+                <span class="actDangerMiniTag danger">危険</span>
+              </div></div>
             <div class="actDangerAnalysisText">スケールやデッキ回転が不足すると、長期戦で重要札に届かずボス戦で押し負けやすいです。</div>
           </div>
         </div>
@@ -13726,7 +13764,7 @@ function isSharedCard(c){
   return SHARED_CARD_GROUP_IDS.includes(c.character) || (c.groups || []).some(g => SHARED_CARD_GROUP_IDS.includes(g));
 }
 
-function cardBelongsToCharacter(c, characterId=currentCharacter){
+function cardBelongsToCharacter(c, characterId=cardListCharacter){
   // キャラ別一覧には無色カードを混在させない。
   // 無色カードはDB上に残し、別カテゴリ扱いとして維持する。
   if(["ironclad","silent","regent","defect","necrobinder"].includes(characterId)){
@@ -13738,7 +13776,11 @@ function cardBelongsToCharacter(c, characterId=currentCharacter){
 function getCurrentCharacterCards(){
   // 表示中のキャラフィルタとカード種別フィルタに合わせてタグ候補を出す。
   // 通常キャラ表示では無色を混在させず、エンシェント/イベント選択時のみ共通カードを含める。
-  return CARD_DB.filter(c => cardMatchesCharacterFilter(c) && cardMatchesCategoryFilter(c));
+  const signature = `${cardListCharacter}|${currentCategory}`;
+  if(lastCurrentCharacterCardsState.signature === signature) return lastCurrentCharacterCardsState.cards;
+  const cards = CARD_DB.filter(c => cardMatchesCharacterFilter(c) && cardMatchesCategoryFilter(c));
+  lastCurrentCharacterCardsState = { signature, cards };
+  return cards;
 }
 
 function getAnalysisCharacter(deckList=deck){
@@ -13747,7 +13789,7 @@ function getAnalysisCharacter(deckList=deck){
 }
 
 function getActiveCharacterName(){
-  return characterDataById(currentCharacter).name;
+  return characterDataById(cardListCharacter || currentCharacter).name;
 }
 
 const STARTER_DECKS = {
@@ -13782,7 +13824,10 @@ let nextPicks = [];
 let editTarget = "deck";
 // current* は検索実行済み条件、pending* は画面で選択中の未反映条件。
 let currentCharacter = currentHero;
-let pendingCharacter = currentCharacter;
+// カード一覧の表示キャラは、分析対象(currentHero/currentCharacter)とは分離する。
+// 上側スターター選択は分析対象、下側カード一覧タブは検索・追加用フィルタだけを変える。
+let cardListCharacter = currentCharacter;
+let pendingCharacter = cardListCharacter;
 let currentCategory = "normal";
 let pendingCategory = currentCategory;
 let typeFilter = "all";
@@ -13804,12 +13849,40 @@ const PERF_LIMITS = {
   maxBestTurnDepth: 20
 };
 const analysisCache = new Map();
+const CARD_BY_ID = new Map(CARD_DB.map(c => [c.id, c]));
 let lastCardRenderState = { signature:"", ids:"" };
 let lastTagTabsSignature = "";
+let lastFilteredCardState = { signature:"", cards:[] };
+let lastCurrentCharacterCardsState = { signature:"", cards:[] };
 
 function resetCardListRenderCache(resetTags=false){
   if(resetTags) lastTagTabsSignature = "";
   lastCardRenderState = { signature:"", ids:"" };
+  lastFilteredCardState = { signature:"", cards:[] };
+  lastCurrentCharacterCardsState = { signature:"", cards:[] };
+}
+
+function cardSearchText(card){
+  if(!card) return "";
+  if(card._searchText === undefined){
+    Object.defineProperty(card, "_searchText", {
+      value: [card.nameJa, card.nameEn, card.id, (card.tags||[]).join(" "), card.effectText].join(" ").toLowerCase(),
+      enumerable:false,
+      configurable:true
+    });
+  }
+  return card._searchText;
+}
+function buildTargetCountMap(target){
+  const map = new Map();
+  (target || []).forEach(x=>{
+    const key = `${x.id}|${!!x.upgraded}|${!!x.enchanted}`;
+    map.set(key, (map.get(key)||0)+1);
+  });
+  return map;
+}
+function countFromMap(map,id,upgraded,enchanted=false){
+  return map.get(`${id}|${!!upgraded}|${!!enchanted}`) || 0;
 }
 
 function ensureTagSet(card){
@@ -13972,22 +14045,23 @@ function isNormalListCard(c){
     && !["curse", "status"].includes(c?.character);
 }
 function cardMatchesCharacterFilter(c){
-  if(currentCharacter === "all") return true;
+  const listCharacter = cardListCharacter || currentCharacter;
+  if(listCharacter === "all") return true;
   const groups = Array.isArray(c?.groups) ? c.groups : [];
   const classCharacters = ["ironclad", "silent", "regent", "defect", "necrobinder"];
-  const belongsToCurrent = c?.character === currentCharacter || groups.includes(currentCharacter);
+  const belongsToCurrent = c?.character === listCharacter || groups.includes(listCharacter);
   const belongsToAll = c?.character === "all" || groups.includes("all");
 
   // 表示中カード × カード種別で必ず絞り込む。
   // 無色（仮）は通常無色に加え、非キャラ扱いのエンシェント／イベント／生成カードを種別別に表示できる入口にする。
-  if(currentCharacter === "colorless"){
+  if(listCharacter === "colorless"){
     if(currentCategory === "ancient") return c?.character === "ancient" || c?.character === "colorless" || groups.includes("colorless") || belongsToAll;
     if(currentCategory === "event") return c?.character === "event" || c?.character === "all" || groups.includes("event") || groups.includes("colorless") || belongsToAll;
     if(currentCategory === "generated") return c?.character === "colorless" || c?.character === "event" || c?.character === "all" || groups.includes("colorless") || belongsToAll;
     return c?.character === "colorless" || groups.includes("colorless");
   }
 
-  if(classCharacters.includes(currentCharacter)){
+  if(classCharacters.includes(listCharacter)){
     if(currentCategory === "ancient") return belongsToCurrent || (belongsToAll && isAncientListCard(c));
     if(currentCategory === "event") return belongsToCurrent || c?.character === "event" || belongsToAll;
     if(currentCategory === "generated") return belongsToCurrent || belongsToAll;
@@ -14018,29 +14092,32 @@ function cardMatchesCategoryFilter(c){
 }
 function filteredCardsForCurrentView(){
   const q=String(currentSearchText || "").trim().toLowerCase();
-  return CARD_DB
-    .filter(c=>cardMatchesCharacterFilter(c))
-    .filter(c=>cardMatchesTypeFilter(c))
-    .filter(c=>cardMatchesRarityFilter(c))
-    .filter(c=>cardMatchesCategoryFilter(c))
-    .filter(c=>tagFilter==="all" || hasTagFast(c, tagFilter))
-    .filter(c=>{
-      if(!q) return true;
-      const tagText=(c.tags||[]).join(" ").toLowerCase();
-      const effectText=String(c.effectText || "").toLowerCase();
-      return String(c.nameJa || "").toLowerCase().includes(q)||String(c.nameEn || "").toLowerCase().includes(q)||String(c.id || "").toLowerCase().includes(q)||tagText.includes(q)||effectText.includes(q);
-    });
+  const signature = `${cardListCharacter}|${currentCategory}|${typeFilter}|${rarityFilter}|${tagFilter}|${q}`;
+  if(lastFilteredCardState.signature === signature) return lastFilteredCardState.cards;
+  const out=[];
+  for(const c of CARD_DB){
+    if(!cardMatchesCharacterFilter(c)) continue;
+    if(!cardMatchesTypeFilter(c)) continue;
+    if(!cardMatchesRarityFilter(c)) continue;
+    if(!cardMatchesCategoryFilter(c)) continue;
+    if(tagFilter!=="all" && !hasTagFast(c, tagFilter)) continue;
+    if(q && !cardSearchText(c).includes(q)) continue;
+    out.push(c);
+  }
+  lastFilteredCardState = { signature, cards:out };
+  return out;
 }
 function updateRenderedCardCounts(){
   const target = editTarget==="deck" ? deck : nextPicks;
+  const counts = buildTargetCountMap(target);
   document.querySelectorAll("#cards .cardItem[data-card-id]").forEach(div=>{
     const id=div.getAttribute("data-card-id");
     const normal=div.querySelector('[data-count-kind="normal"]');
     const upgraded=div.querySelector('[data-count-kind="upgraded"]');
     const enchanted=div.querySelector('[data-count-kind="enchanted"]');
-    if(normal) normal.textContent = `${countIn(target,id,false,false)}枚`;
-    if(upgraded) upgraded.textContent = `${countIn(target,id,true,false)}枚`;
-    if(enchanted) enchanted.textContent = `${countIn(target,id,false,true)}枚`;
+    if(normal) normal.textContent = `${countFromMap(counts,id,false,false)}枚`;
+    if(upgraded) upgraded.textContent = `${countFromMap(counts,id,true,false)}枚`;
+    if(enchanted) enchanted.textContent = `${countFromMap(counts,id,false,true)}枚`;
   });
 }
 
@@ -14094,7 +14171,7 @@ function syncCharacterTabButtons(rootId, buttonClass, activeId){
   });
 }
 
-function cardById(id){ return CARD_DB.find(c => c.id === id) || CARD_DB[0]; }
+function cardById(id){ return CARD_BY_ID.get(id) || CARD_DB[0]; }
 function getCard(inst){
   const base = cardById(inst.id);
   if (!inst.upgraded || !base.upgraded) return {...base, upgradedInstance:false};
@@ -14150,7 +14227,7 @@ function handleCardSearchKey(ev){
 function executeCardSearch(){
   const searchEl=document.getElementById("search");
   pendingSearchText = searchEl ? searchEl.value : pendingSearchText;
-  currentCharacter = pendingCharacter || currentCharacter || "all";
+  cardListCharacter = pendingCharacter || cardListCharacter || currentCharacter || "all";
   currentCategory = pendingCategory || "normal";
   typeFilter = pendingTypeFilter || "all";
   rarityFilter = pendingRarityFilter || "all";
@@ -14168,7 +14245,7 @@ function setFilterButtonActive(selector, value){
   activateFilterButtonByValue(selector, value);
 }
 function clearCardFilters(){
-  currentCharacter = isCharacterImplemented(currentHero) ? currentHero : "all";
+  cardListCharacter = isCharacterImplemented(currentHero) ? currentHero : "all";
   currentCategory = "normal";
   typeFilter = "all";
   rarityFilter = "all";
@@ -15468,6 +15545,26 @@ function axisProfileByName(axis){
       description:"廃棄で不要札を処理し、堕落・無痛・鬼火などの接続で循環や防御へ変換する軸です。",
       tags:["廃棄", "循環", "接続"]
     };
+    if(/ナイフ|shiv|knife/.test(source)) return {
+      key:"shiv",
+      description:"ナイフ生成・手数・火力変換をつなげ、短期火力やバーストへ伸ばす軸です。",
+      tags:["ナイフ", "手数", "火力変換"]
+    };
+    if(/毒|poison/.test(source)) return {
+      key:"poison",
+      description:"毒付与・毒加速・耐久をつなげ、長期戦で削り切る軸です。",
+      tags:["毒付与", "毒加速", "耐久"]
+    };
+    if(/スライ|discard|slide/.test(source)) return {
+      key:"discard",
+      description:"スライ起動札・コンボ札・循環をつなげ、手札交換や到達力で勝つ軸です。",
+      tags:["スライ起動", "コンボ", "循環"]
+    };
+    if(/防御継続|Footwork|Blur|Leg Sweep|Piercing Wail|After Image|フットワーク|ブラー|足払い|金切り声|残像/.test(source)) return {
+      key:"silentDefense",
+      description:"フットワーク・ブラー・足払い・金切り声・残像などで、被弾を抑えながら勝ち筋を支える補助軸です。",
+      tags:["防御継続", "被弾軽減", "補助"]
+    };
     if(/自傷|傷口|selfDamage/.test(source)) return {
       key:"selfDamage",
       description:"HPをリソースにしたカードを、火力・筋力・回復へ変換して押し切る軸です。",
@@ -15900,8 +15997,23 @@ function renderRegentEconomyWinConditionPanel(validation){
     const value = String(item && item.value || st.label || '確認中');
     const score = Number(item && item.score) || 0;
     if(score >= 65) return `現状：${name}は${value}。生成したリソースが火力・防御・継戦能力へつながり、勝ち筋として読みやすい状態です。`;
-    if(score >= 35) return `現状：${name}は${value}。部品はありますが、生成から実戦出力への接続がまだ形成中です。`;
+    if(score >= 35) return `現状：${name}は${value}。パーツはありますが、生成から実戦出力への接続がまだ形成中です。`;
     return `現状：${name}は${value}。関連カードや変換先が少なく、現時点では経済として未成立です。`;
+  }
+  function regentSupportDescription(item){
+    const name = String(item && item.name || '補助・到達状況');
+    if(/無色/.test(name)) return '無色生成は、セットアップ安定化・疑似ドロー・状況対応・生成シナジーの起点として扱います。';
+    if(/ミニオン/.test(name)) return 'ミニオンは、圧縮・不要札処理・状態異常対策・必要札到達補助として扱います。';
+    if(/セットアップ|setup/.test(name)) return 'セットアップは、生成したリソースを実戦出力へつなげるまでの安定度と到達速度を確認します。';
+    if(/バースト|burst/.test(name)) return 'バースト到達は、生成したリソースを決定力や短期火力へ変換できるかを確認します。';
+    return '補助・到達状況は、メイン経済が実戦で動くまでの安定化や接続を確認します。';
+  }
+  function regentSupportCurrentComment(item){
+    const name = String(item && item.name || '補助・到達状況');
+    const value = String(item && item.value || '確認中');
+    if(/不足|弱|遅|不安|停滞|なし|低/.test(value)) return `現状：${name}は${value}。メイン経済へ接続する補助が薄く、成立前に止まりやすい状態です。`;
+    if(/十分|良好|高|あり|機能|成立/.test(value)) return `現状：${name}は${value}。メイン経済を支える補助として機能しています。`;
+    return `現状：${name}は${value}。この補助が火力・防御・継戦能力へつながっているかを確認します。`;
   }
   const economyCards = (data.mainEconomies || []).map(item => {
     const st = stateFor(Number(item.score)||0);
@@ -15909,8 +16021,12 @@ function renderRegentEconomyWinConditionPanel(validation){
     return `<div class="winAxisCard ${st.cls}"><div class="winAxisHead"><div class="winAxisName">${esc(item.name)}</div><div class="winAxisStatus ${st.cls}">${esc(item.value || st.label)}</div></div><div class="winAxisDescription"><b>項目説明：</b>${esc(item.summary || "生成・消費・変換の接続を確認します。")}</div><div class="winAxisCurrent"><b>現状コメント：</b>${esc(current)}</div><div class="winAxisTags"><span class="winAxisTag priority">${esc(item.name)}：${esc(item.value || "未形成")}</span></div></div>`;
   }).join("");
   const bottlenecks = (data.bottlenecks || []).map(x=>`<li>${esc(x)}</li>`).join("") || "<li>経済停滞は確認中です。</li>";
-  const supports = (data.support || []).map(item => `<div class="supportRow"><div class="supportLabel">${esc(item.name)}</div><div class="supportValue">${esc(item.value)}</div></div>`).join("");
-  return `<div class="winStructurePanel"><div class="winStructureTitle">勝ち筋分類</div><div class="winStructureLead">${esc(validation.conclusion || "リージェントはメイン経済・経済停滞・補助到達で確認します。")}</div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">メイン経済</div><div class="winSectionHint">エナジー・スター・鍛造を何へ変換しているか</div></div><div class="winAxisGrid">${economyCards}</div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">経済停滞</div><div class="winSectionHint">生成したリソースが勝利へ接続できているか</div></div><div class="winStructureNote"><div><b>現状コメント：</b>このデッキで止まっている生成・変換・決定力を確認します。</div><ul>${bottlenecks}</ul></div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">補助・到達状況</div><div class="winSectionHint">セットアップ・無色生成・ミニオン・到達速度</div></div><div class="supportList">${supports}</div></div><div class="winStructureNote">リージェントは単純な軸名ではなく、生成・変換・経済停滞で確認します。無色生成とミニオンは主勝ち筋ではなく補助として扱います。</div></div>`;
+  const supports = (data.support || []).map(item => {
+    const desc = regentSupportDescription(item);
+    const current = regentSupportCurrentComment(item);
+    return `<div class="supportRow supportCommentRow"><div class="supportLabel">${esc(item.name)}</div><div class="supportValue">${esc(item.value)}</div><div class="winAxisDescription"><b>項目説明：</b>${esc(desc)}</div><div class="winAxisCurrent"><b>現状コメント：</b>${esc(current)}</div></div>`;
+  }).join("");
+  return `<div class="winStructurePanel"><div class="winStructureTitle">勝ち筋分類</div><div class="winStructureLead">${esc(validation.conclusion || "リージェントはメイン経済・経済停滞・補助到達で確認します。")}</div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">メイン経済</div><div class="winSectionHint">エナジー・スター・鍛造を何へ変換しているか</div></div><div class="winAxisGrid">${economyCards}</div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">経済停滞</div><div class="winSectionHint">生成したリソースが勝利へ接続できているか</div></div><div class="winStructureNote"><div><b>項目説明：</b>生成したスター・エナジー・鍛造などが、火力・防御・継戦能力へ変換されず止まっている箇所を確認します。</div><div><b>現状コメント：</b>このデッキで止まっている生成・変換・決定力を確認します。</div><ul>${bottlenecks}</ul></div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">補助・到達状況</div><div class="winSectionHint">セットアップ・無色生成・ミニオン・到達速度</div></div><div class="supportList">${supports}</div></div><div class="winStructureNote">リージェントは単純な軸名ではなく、生成・変換・経済停滞で確認します。無色生成とミニオンは主勝ち筋ではなく補助として扱います。</div></div>`;
 }
 
 function renderCharacterWinConditionValidation(validation){
@@ -15921,13 +16037,17 @@ function renderCharacterWinConditionValidation(validation){
   }
   const rows = validation.axes.map(axis=>{
     const st=winConditionState(axis.score);
+    const needs = typeof axisNeedsForCard === "function" ? axisNeedsForCard(axis) : (axis.needs || []);
+    const description = typeof axisDescriptionForCard === "function" ? axisDescriptionForCard(axis, validation) : (validation.character === "silent" ? compactSilentSummary(axis) : summarizeGenericAxis(axis));
+    const current = typeof axisCurrentCommentForCard === "function" ? axisCurrentCommentForCard(axis, validation, st, needs) : "この軸は現在のデッキ内容から成立度を確認中です。";
     return `
       <div class="winAxisCard ${st.cls}">
         <div class="winAxisHead">
-          <div class="winAxisName">${axis.name}</div>
-          <div class="winAxisStatus ${st.cls}">${st.label}</div>
+          <div class="winAxisName">${typeof escDisplay === "function" ? escDisplay(axis.name, "未判定") : axis.name}</div>
+          <div class="winAxisStatus ${st.cls}">${typeof escDisplay === "function" ? escDisplay(st.label, "未成立") : st.label}</div>
         </div>
-        <div class="winAxisSummary">${validation.character === "silent" ? compactSilentSummary(axis) : summarizeGenericAxis(axis)}</div>
+        <div class="winAxisDescription"><b>軸説明：</b>${typeof escDisplay === "function" ? escDisplay(description, "確認中です。") : description}</div>
+        <div class="winAxisCurrent"><b>現状コメント：</b>${typeof escDisplay === "function" ? escDisplay(current, "この軸は現在のデッキ内容から成立度を確認中です。") : current}</div>
         <div class="winAxisTags">${renderAxisNeedTags(axis)}</div>
       </div>
     `;
@@ -15977,25 +16097,25 @@ function renderSilentFlowAnalysis(flow){
 }
 
 function classifyWinCondition(s){
-  if(s.cards?.some(c=>c.character === "silent")){
-    if(ENABLE_SILENT_FULL_ANALYSIS) return analyzeSilentAxes(s.cards);
-    return {name:"サイレント準備中", mainAxis:"サイレント準備中", subAxes:[], completion:0, state:{label:"準備中",cls:"weak"}, reasons:["サイレントの毒・ナイフ・スライ解析は次フェーズで追加予定です。今回は共通解析のみ表示します。"]};
-  }
-
   const sourceCards = s.cards || [];
   const regentCount = sourceCards.filter(c=>c.character === "regent").length;
   const ironcladCount = sourceCards.filter(c=>c.character === "ironclad").length;
   const silentCount = sourceCards.filter(c=>c.character === "silent").length;
   if(regentCount > 0 && regentCount >= ironcladCount && regentCount >= silentCount){
     return {
-      name:"主軸未確定",
-      mainAxis:"主軸未確定",
+      name:"リージェント経済分析",
+      mainAxis:"リージェント経済分析",
       subAxes:[],
       completion:0,
       state:{label:"仮対応",cls:"weak"},
-      axes:[{key:"regent_phase1",name:"主軸未確定",score:0,reason:"リージェント専用分析は調整中です。今回はカード追加と基本診断のみ対応しています。"}],
-      reasons:["リージェント専用分析は調整中です。今回はカード追加と基本診断のみ対応しています。"]
+      axes:[{key:"regent_economy",name:"リージェント経済分析",score:0,reason:"リージェントはメイン経済・経済停滞・補助到達で確認します。"}],
+      reasons:["リージェントはメイン経済・経済停滞・補助到達で確認します。"]
     };
+  }
+
+  if(sourceCards.some(c=>c.character === "silent")){
+    if(ENABLE_SILENT_FULL_ANALYSIS) return analyzeSilentAxes(sourceCards);
+    return {name:"サイレント準備中", mainAxis:"サイレント準備中", subAxes:[], completion:0, state:{label:"準備中",cls:"weak"}, reasons:["サイレントの毒・ナイフ・スライ解析は次フェーズで追加予定です。今回は共通解析のみ表示します。"]};
   }
 
   const cards=sourceCards;
@@ -16244,7 +16364,9 @@ function inferHeroFromDeck(deckList){
     const c = cardById(inst.id);
     if(counts[c.character] !== undefined) counts[c.character]++;
   });
-  return Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0] || currentHero;
+  const best = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+  // クラス札がない空デッキ/呪いのみのデッキでは、先頭のIroncladへ戻さず現在選択中のキャラを維持する。
+  return best && best[1] > 0 ? best[0] : (currentHero || currentCharacter || "ironclad");
 }
 function refreshAfterCharacterChange(){
   invalidateAnalysisCache();
@@ -16258,7 +16380,7 @@ function refreshAfterCharacterChange(){
   }
 }
 function resetPendingFiltersToApplied(){
-  pendingCharacter = currentCharacter;
+  pendingCharacter = cardListCharacter || currentCharacter;
   pendingCategory = currentCategory;
   pendingTypeFilter = typeFilter;
   pendingRarityFilter = rarityFilter;
@@ -16268,7 +16390,7 @@ function resetPendingFiltersToApplied(){
 function hasPendingFilterChanges(){
   const searchEl=document.getElementById("search");
   const visibleSearch = searchEl ? searchEl.value : pendingSearchText;
-  return pendingCharacter !== currentCharacter
+  return pendingCharacter !== (cardListCharacter || currentCharacter)
     || pendingCategory !== currentCategory
     || pendingTypeFilter !== typeFilter
     || pendingRarityFilter !== rarityFilter
@@ -16295,6 +16417,7 @@ function setHero(heroId, reset=true){
   if(!isCharacterImplemented(heroId)) return;
   currentHero = heroId;
   currentCharacter = heroId;
+  cardListCharacter = heroId;
   currentCategory = "normal";
   typeFilter = "all";
   rarityFilter = "all";
@@ -16314,13 +16437,25 @@ function setHero(heroId, reset=true){
 }
 function setCardListCharacter(heroId){
   if(!(heroId === "all" || heroId === "colorless" || heroId === "regent" || isCharacterImplemented(heroId))) return;
+  cardListCharacter = heroId;
   pendingCharacter = heroId;
+  currentCategory = "normal";
   pendingCategory = "normal";
+  typeFilter = "all";
   pendingTypeFilter = "all";
+  rarityFilter = "all";
   pendingRarityFilter = "all";
+  tagFilter = "all";
   pendingTagFilter = "all";
+  currentSearchText = "";
+  pendingSearchText = "";
+  const searchEl=document.getElementById("search");
+  if(searchEl) searchEl.value="";
+  resetCardListRenderCache(true);
   syncPendingFilterButtons();
   renderCharacters();
+  renderCurrentCharacterBadges();
+  renderCards();
   updateFilterPendingNotice();
 }
 function resetStarterDeck(){
@@ -16338,12 +16473,14 @@ function renderHeroSelector(){
   const meta=document.getElementById("heroStarterMeta");
   if(meta){
     const starterCount=(STARTER_DECKS[currentHero]||[]).length;
-    meta.textContent=starterCount === 0 ? "初期デッキ：将来対応予定です。カード一覧の枠だけ先に確認できます。" : `初期デッキ：${starterCount}枚。ボタンでいつでもこの状態に戻せます。`;
+    meta.textContent=starterCount === 0
+      ? (currentHero === "regent" ? "初期デッキ：リージェントスターターは準備中です。選択時は旧デッキを残さず空のリージェントデッキに切り替えます。" : "初期デッキ：将来対応予定です。カード一覧の枠だけ先に確認できます。")
+      : `初期デッキ：${starterCount}枚。ボタンでいつでもこの状態に戻せます。`;
   }
 }
 
 function renderCharacters(){
-  syncCharacterTabButtons("characterTabs", "charTab", pendingCharacter || currentCharacter);
+  syncCharacterTabButtons("characterTabs", "charTab", pendingCharacter || cardListCharacter || currentCharacter);
   updateFilterPendingNotice();
 }
 
@@ -16500,7 +16637,7 @@ function renderTagTabs(){
   const tags = [...new Set(cards.flatMap(c=>c.tags||[]))].sort((a,b)=>a.localeCompare(b,"ja"));
   if(tagFilter !== "all" && !tags.includes(tagFilter)) tagFilter = "all";
   if(pendingTagFilter !== "all" && !tags.includes(pendingTagFilter)) pendingTagFilter = "all";
-  const signature = `${currentCharacter}|${tagFilter}|${pendingTagFilter}|${tags.join("|")}`;
+  const signature = `${cardListCharacter}|${tagFilter}|${pendingTagFilter}|${tags.join("|")}`;
   if(signature === lastTagTabsSignature) return;
   lastTagTabsSignature = signature;
   const tagSet = new Set(tags);
@@ -16525,7 +16662,7 @@ function renderCards(){
   const visibleCards = filteredCardsForCurrentView();
   const idsSignature = visibleCardSignature(visibleCards);
   const targetSignature = deckSignature(editTarget==="deck" ? deck : nextPicks);
-  const renderSignature = `${currentCharacter}|${currentCategory}|${typeFilter}|${rarityFilter}|${tagFilter}|${currentSearchText}|${editTarget}|${targetSignature}`;
+  const renderSignature = `${cardListCharacter}|${currentCategory}|${typeFilter}|${rarityFilter}|${tagFilter}|${currentSearchText}|${editTarget}|${targetSignature}`;
 
   // 表示カードの並びが変わっていない場合はDOM再生成せず、枚数だけ差分更新する。
   if(lastCardRenderState.ids === idsSignature && root.children.length === visibleCards.length){
@@ -16535,6 +16672,7 @@ function renderCards(){
   }
 
   const target = editTarget==="deck" ? deck : nextPicks;
+  const counts = buildTargetCountMap(target);
   const fragment=document.createDocumentFragment();
   visibleCards.forEach(c=>{
     const div=document.createElement("div");
@@ -16556,15 +16694,15 @@ function renderCards(){
       ${renderCompactCardTags(c)}
       <div class="countRows">
         <div class="countRow">
-          <div><div class="countLabel">通常枚数</div><div class="countNum" data-count-kind="normal">${countIn(target,c.id,false,false)}枚</div></div>
+          <div><div class="countLabel">通常枚数</div><div class="countNum" data-count-kind="normal">${countFromMap(counts,c.id,false,false)}枚</div></div>
           <div class="btns"><button class="smallBtn" onclick="removeCard('${c.id}',false,false)">−</button><button class="smallBtn plus" onclick="addCard('${c.id}',false,false)">＋</button></div>
         </div>
         <div class="countRow upgradeBox">
-          <div><div class="countLabel">強化枚数</div><div class="countNum" data-count-kind="upgraded">${countIn(target,c.id,true,false)}枚</div></div>
+          <div><div class="countLabel">強化枚数</div><div class="countNum" data-count-kind="upgraded">${countFromMap(counts,c.id,true,false)}枚</div></div>
           <div class="btns"><button class="smallBtn" onclick="removeCard('${c.id}',true,false)">−</button><button class="smallBtn plus up" onclick="addCard('${c.id}',true,false)">＋</button></div>
         </div>
         <div class="countRow enchantBox">
-          <div><div class="countLabel">エンチャント</div><div class="countNum" data-count-kind="enchanted">${countIn(target,c.id,false,true)}枚</div></div>
+          <div><div class="countLabel">エンチャント</div><div class="countNum" data-count-kind="enchanted">${countFromMap(counts,c.id,false,true)}枚</div></div>
           <div class="btns"><button class="smallBtn" onclick="removeCard('${c.id}',false,true)">−</button><button class="smallBtn plus" onclick="addCard('${c.id}',false,true)">＋</button></div>
         </div>
       </div>
@@ -16627,7 +16765,7 @@ function buildBeginnerConclusion(a){
     return "カードの重さに対してエナジーが足りず、手札を使い切れないターンが出やすいです。軽いカードかエナジー補助が欲しいです。";
   }
   if(e.rank === "S" || e.rank === "A"){
-    return `${e.label}向けとしてかなりまとまっています。大きな弱点は少ないので、今の勝ち筋を伸ばすカードを優先してください。`;
+    return "主要な勝ち筋が成立しており、火力・防御・スケールも高い水準です。大きな補強よりも、無理なルート選択・事故率を上げないピック・プレイ判断のブレに注意したい状態です。";
   }
   return e.comment || "デッキの方向性は見えていますが、まだ決定打が足りません。弱点を1つずつ補うと安定します。";
 }
@@ -17592,7 +17730,7 @@ function renderPriorityFocus(a){
   if(cards){
     const rows=[
       {label:"最優先", item:first, className:"priority"},
-      {label:"次に見る", item:second, className:"secondary"},
+      {label:"必要カード", item:second, className:"secondary"},
       {label:"後で補う", item:later, className:"later"}
     ].filter(x=>x.item);
     cards.innerHTML=rows.map(x=>`
@@ -17899,11 +18037,26 @@ function renderProductionOutputSlots(a){
   const mainAxisObj = axisObjectByName(mainAxisName);
   const subAxisObj = axisObjectByName(subAxisName);
   const winRoot = document.getElementById('firstViewWinList');
+  function firstViewStateForAxis(axis){
+    const score = Math.max(0, Math.min(100, Math.round(Number(axis && axis.score) || 0)));
+    if(score >= 65) return {label:'成立', cls:'ok', score};
+    if(score >= 35) return {label:'形成中', cls:'mid', score};
+    return {label:'未成立', cls:'bad', score};
+  }
+  function firstViewNeedsForAxis(axis){
+    const raw = (axis && (axis.needs || axis.tags || axis.badges)) || [];
+    return (Array.isArray(raw) ? raw : [raw]).map(x => safeText(x)).filter(Boolean).filter(x => !/大きな不足なし/.test(x)).slice(0, 3);
+  }
+  /* impl151: firstViewCurrentComment removed; 1stビューは短い要約のみ表示し、現状コメントは詳細側で表示する。 */
+  function firstViewCardHtml(axis, role, cls, name, summary){
+    const st = firstViewStateForAxis(axis);
+    return `<div class="firstViewWinCard ${cls}"><div class="firstViewWinTop"><div class="firstViewWinMeta"><div class="firstViewWinRole">${esc(role)}</div><div class="firstViewWinStatus ${esc(st.cls)}">${esc(st.label)}</div></div><div class="firstViewWinBody"><div class="firstViewWinName">${esc(name)}</div><div class="firstViewWinSummary">${esc(summary)}</div></div></div></div>`;
+  }
   if(winRoot){
     const mainSummary = isRegentEconomyDisplay ? 'リージェントは「何を作り、何に変え、どこで止まるか」でデッキ状態を確認します。' : (starterLikeView ? '軸になるカードがまだ少ない状態です。次の数枚で勝ち筋を作ります。' : (mainAxisName === '主軸未確定' ? 'まだ勝ち筋は定まっていません。軸札と支え札を増やしたい状態です。' : axisSummaryText(mainAxisObj, '主軸候補です。成立度の細かい評価は詳細診断で確認してください。')));
     const subSummary = axisSummaryText(subAxisObj, '主軸を支える補助です。完成扱いかどうかは詳細診断で確認します。');
-    const mainCard = `<div class="firstViewWinCard main"><div class="firstViewWinTop"><div><div class="firstViewWinRole">主軸</div><div class="firstViewWinName">${esc(mainAxisName)}</div></div></div><div class="firstViewWinSummary">${esc(mainSummary)}</div></div>`;
-    const subCard = subAxisName ? `<div class="firstViewWinCard sub"><div class="firstViewWinTop"><div><div class="firstViewWinRole">補助</div><div class="firstViewWinName">${esc(subAxisName)}</div></div></div><div class="firstViewWinSummary">${esc(subSummary)}</div></div>` : '';
+    const mainCard = firstViewCardHtml(mainAxisObj, '主軸', 'main', mainAxisName, mainSummary);
+    const subCard = subAxisName ? firstViewCardHtml(subAxisObj, '補助', 'sub', subAxisName, subSummary) : '';
     winRoot.innerHTML = mainCard + subCard;
   }
   const winNote = document.getElementById('firstViewWinNote');
@@ -17965,7 +18118,8 @@ function renderProductionOutputSlots(a){
 }
 
 function renderAnalysis(){
-  const a=analyzeDeck(deck);
+  let a=analyzeDeck(deck);
+  if(window.impl172FinalizeAnalysis){ try{ a = window.impl172FinalizeAnalysis(a, deck) || a; }catch(e){} }
   try{ if(typeof renderProductionOutputSlots === "function") renderProductionOutputSlots(a); }catch(e){}
   renderImpl4Focus(a);
   renderList("deckListDiagnosis",deck);
@@ -18023,8 +18177,9 @@ function renderMissingCards(){
   const list = document.getElementById("missingList");
   if(!panel || !text || !list) return;
 
-  const target = CARD_TARGETS[currentCharacter];
-  if(!isCharacterImplemented(currentCharacter)){
+  const listCharacterId = cardListCharacter || currentCharacter;
+  const target = CARD_TARGETS[listCharacterId];
+  if(!isCharacterImplemented(listCharacterId)){
     panel.classList.add("ok");
     text.textContent = `${getActiveCharacterName()}は準備中です。今回はカード一覧・分析関数の入口のみ用意しています。`;
     list.innerHTML = "";
@@ -18037,7 +18192,7 @@ function renderMissingCards(){
     return;
   }
 
-  const implemented = implementedNamesForCharacter(currentCharacter);
+  const implemented = implementedNamesForCharacter(listCharacterId);
   const missing = target.filter(name => !implemented.has(name));
   const total = target.length;
   const done = total - missing.length;
@@ -18078,14 +18233,14 @@ function renderDeckComposition(){
   });
 }
 function renderCurrentCharacterBadges(){
-  const deckCharacter = heroById(inferHeroFromDeck(deck));
+  const deckCharacter = heroById(currentHero || currentCharacter || inferHeroFromDeck(deck));
   const analysisCharacter = heroById(currentHero);
-  const listCharacter = characterDataById(currentCharacter);
+  const listCharacter = characterDataById(cardListCharacter || currentCharacter);
   const deckName = deckCharacter.nameJa || deckCharacter.name;
   const analysisName = analysisCharacter.nameJa || analysisCharacter.name;
   const listName = listCharacter.name || currentCharacter;
   const baseHtml = `現在のデッキ：${escapeHtml(deckName)}<small>分析中デッキ：${escapeHtml(analysisName)}</small>`;
-  const listNote = currentCharacter !== deckCharacter.id ? `<small>表示中カード：${escapeHtml(listName)}</small>` : "";
+  const listNote = (cardListCharacter || currentCharacter) !== deckCharacter.id ? `<small>表示中カード：${escapeHtml(listName)}</small>` : "";
   const diagnosisEl = document.getElementById("currentCharacterBadgeDiagnosis");
   if(diagnosisEl) diagnosisEl.innerHTML = baseHtml;
   const cardDbEl = document.getElementById("currentCharacterBadgeCardDb");
@@ -18097,10 +18252,10 @@ function renderCurrentCharacterBadges(){
     const categoryNotice = currentCategory === "ancient" ? "エンシェント（仮）は、エンシェントから授かる特殊カードです。カード追加と基本診断はできますが、入手元・専用シナジー評価は調整中です。"
       : currentCategory === "event" ? "イベント（仮）は、イベントで入手する特殊カードです。カード追加と基本診断はできますが、入手条件・特殊効果の評価は調整中です。"
       : currentCategory === "generated" ? "生成カードは、戦闘中に作られるカードです。表示・検索・追加はできますが、生成元や専用コンボ評価は調整中です。"
-      : currentCharacter === "colorless" ? "無色（仮）は、全キャラで使える汎用カードです。カード追加と基本診断はできますが、キャラ専用シナジー評価は調整中です。"
-      : currentCharacter === "regent" ? "リージェントは現在仮対応です。カード追加と経済ベースの仮診断に対応していますが、分析精度は調整中です。"
+      : (cardListCharacter || currentCharacter) === "colorless" ? "無色（仮）は、全キャラで使える汎用カードです。カード追加と基本診断はできますが、キャラ専用シナジー評価は調整中です。"
+      : (cardListCharacter || currentCharacter) === "regent" ? "リージェントは現在仮対応です。カード追加と経済ベースの仮診断に対応していますが、分析精度は調整中です。"
       : "";
-    cardListNoticeEl.textContent = currentCharacter !== deckCharacter.id
+    cardListNoticeEl.textContent = (cardListCharacter || currentCharacter) !== deckCharacter.id
       ? `表示中カードは${listName}です。追加先は現在のデッキ設定に従います。${categoryNotice ? " " + categoryNotice : ""}`
       : categoryNotice;
   }
@@ -18337,7 +18492,7 @@ function toggleCardList(){
 function loadFromUrl(){
   const p=new URLSearchParams(location.search).get("deck");
   if(!p)return;
-  try{const data=JSON.parse(decodeURIComponent(escape(atob(p)))); if(Array.isArray(data)){ deck=data; currentHero=inferHeroFromDeck(deck); currentCharacter=currentHero; }}catch(e){}
+  try{const data=JSON.parse(decodeURIComponent(escape(atob(p)))); if(Array.isArray(data)){ deck=data; currentHero=inferHeroFromDeck(deck); currentCharacter=currentHero; cardListCharacter=currentHero; }}catch(e){}
 }
 loadFromUrl();
 if(typeof renderHeroSelector === "function") renderHeroSelector();
@@ -18643,7 +18798,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
     if(panel) panel.classList.toggle('safe', strong);
     if(act) act.textContent = `${label}基準`;
     if(cards){
-      const rows=[{label:'最優先', tag:first, cls:'priority'},{label:'次に見る', tag:second, cls:'secondary'},{label:'後で補う', tag:third, cls:'later'}].filter(x=>x.tag);
+      const rows=[{label:'最優先', tag:first, cls:'priority'},{label:'必要カード', tag:second, cls:'secondary'},{label:'後で補う', tag:third, cls:'later'}].filter(x=>x.tag);
       cards.innerHTML = rows.map(x=>`
         <div class="priorityMissingCard ${x.cls}">
           <div class="priorityMissingLabel">${x.label}</div>
@@ -18893,19 +19048,9 @@ function renderFlexibleWinConditionPanel(rows, scores){
   window.renderAdvancedInsights = function(a){
     const root=document.getElementById('advancedInsights');
     if(!root) return;
-    const floating = a.floatingCards?.length ? a.floatingCards.slice(0,6).map(x=>lightTag(x.name,'warn')).join('') : lightTag('浮いているカード少なめ','ok');
     const win = a.winCondition || {};
+    // impl156: Act評価はAct別危険分析ボックスへ統合するため、独立カードは生成しない。
     root.innerHTML = `
-      <div class="advancedInsightCard ${insightClass(a.actEvaluation.score,false)}">
-        <div class="advancedInsightTitle">Act評価</div>
-        <div class="lightTagRow">${lightTag(a.actEvaluation.label+' '+a.actEvaluation.rank, lightStatusClass(a.actEvaluation.score))}${lightTag('総合 '+a.actEvaluation.score, lightStatusClass(a.actEvaluation.score))}</div>
-        ${lightSummaryDetails('コメント', a.actEvaluation.comment)}
-      </div>
-      <div class="advancedInsightCard warn">
-        <div class="advancedInsightTitle">浮いてるカード</div>
-        <div class="lightTagRow">${floating}</div>
-        ${a.floatingCards?.length ? lightSummaryDetails('理由', a.floatingCards.slice(0,6).map(x=>`<b>${x.name}</b>：${x.reason}`).join('<br>')) : ''}
-      </div>
       <div class="advancedInsightCard winConditionFullCard">
         <div class="advancedInsightTitle">勝ち筋・補助性能</div>
         ${renderFlexibleWinConditionPanel(win.rows || win.axes || win.silentAxes || [{name:win.name,status:win.status,summary:win.summary,tags:win.missing}], a.supportScores || a.radar || {})}
@@ -19376,6 +19521,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
     return {
       name,
       score,
+      rawAxis:axis,
       state:firstViewAxisState(score),
       summary:firstViewAxisSummary(Object.assign({}, axis, {name})),
       tags:firstViewAxisTags(axis)
@@ -19401,26 +19547,51 @@ function renderFlexibleWinConditionPanel(rows, scores){
     if(!hasSeparatedWinAxes) axes.sort((x,y)=>(Number(y?.score)||0)-(Number(x?.score)||0));
     let main=axes[0] || wc.mainAxis || (!badAxisText.test(String(wc.name||'')) ? wc.name : '') || '主軸未確定';
     let sub=axes[1] || (Array.isArray(wc.subAxes) && wc.subAxes[0]) || null;
-    const mainScore=Number((typeof main === 'object' ? main.score : wc.completion) || wc.completion || a?.characterWinValidation?.mainAxis?.score || 0);
-    const subScore=Number((typeof sub === 'object' ? sub.score : 0) || 0);
+    const mainScore=Number((main && typeof main === 'object' ? main.score : wc.completion) || wc.completion || a?.characterWinValidation?.mainAxis?.score || 0);
+    const subScore=Number((sub && typeof sub === 'object' ? sub.score : 0) || 0);
     main=normalizeFirstViewAxis(main, typeof main === 'string' ? main : '主軸未確定', mainScore);
     sub=normalizeFirstViewAxis(sub, typeof sub === 'string' ? sub : '', subScore);
     if(sub && main && sub.name === main.name) sub=null;
     return {main, sub};
   }
-  function renderFirstViewWinCard(axis, role, cls){
+  function compactFirstViewCurrentComment(text){
+    const s=String(text||'').replace(/\s+/g,' ').replace(/^現状：/,'').trim();
+    if(!s) return 'このデッキでの成立状況を確認中です。';
+    return s.length>86 ? s.slice(0,86) + '…' : s;
+  }
+  function firstViewAxisCurrentComment(axis, analysis){
+    if(!axis) return 'このデッキでの成立状況を確認中です。';
+    const validation = analysis && analysis.characterWinValidation;
+    const source = Object.assign({}, axis.rawAxis || axis, {name:axis.name, score:axis.score, summary:axis.summary});
+    try{
+      if(validation && typeof axisCurrentCommentForCard === 'function'){
+        const needs = typeof axisNeedsForCard === 'function' ? axisNeedsForCard(source) : (axis.tags || []);
+        const st = axis.state || (typeof axisState === 'function' ? axisState(source, validation) : {label:'確認中', cls:'mid'});
+        return compactFirstViewCurrentComment(axisCurrentCommentForCard(source, validation, st, needs));
+      }
+    }catch(e){}
+    const name = String(axis.name || 'この軸');
+    const score = Number(axis.score) || 0;
+    const need = (axis.tags || []).find(t=>t && !/大きな不足なし/.test(String(t))) || '';
+    if(score >= 65) return compactFirstViewCurrentComment(`${name}は成立しています。${need ? `ただし${need}が薄い場合は注意です。` : '必要なカードと接続先が揃っています。'}`);
+    if(score >= 35) return compactFirstViewCurrentComment(`${name}のパーツはありますが、まだ接続が不足しており形成中です。${need ? `次に${need}を補うと成立しやすくなります。` : ''}`);
+    return compactFirstViewCurrentComment(`${name}は未成立です。関連カードや接続先を増やしてください。`);
+  }
+  function renderFirstViewWinCard(axis, role, cls, analysis){
     if(!axis) return '';
     const tagHtml=(axis.tags||[]).length ? `<div class="firstViewWinTags">${axis.tags.map(t=>`<span class="firstViewWinTag">${esc(t)}</span>`).join('')}</div>` : '';
     return `<div class="firstViewWinCard ${cls}">
       <div class="firstViewWinTop">
-        <div>
+        <div class="firstViewWinMeta">
           <div class="firstViewWinRole">${role}</div>
-          <div class="firstViewWinName">${esc(axis.name)}</div>
+          <div class="firstViewWinStatus ${axis.state.cls}">${esc(axis.state.label)}</div>
         </div>
-        <div class="firstViewWinStatus ${axis.state.cls}">${esc(axis.state.label)}</div>
+        <div class="firstViewWinBody">
+          <div class="firstViewWinName">${esc(axis.name)}</div>
+          <div class="firstViewWinSummary">${esc(axis.summary)}</div>
+          ${tagHtml}
+        </div>
       </div>
-      <div class="firstViewWinSummary">${esc(axis.summary)}</div>
-      ${tagHtml}
     </div>`;
   }
   function renderFirstViewWinPanel(a){
@@ -19428,19 +19599,163 @@ function renderFlexibleWinConditionPanel(rows, scores){
     const note=document.getElementById('firstViewWinNote');
     if(!root) return;
     if(typeof isStarterLikeDeckForDisplay === 'function' && isStarterLikeDeckForDisplay(a)){
-      root.innerHTML = `<div class="firstViewWinCard main starterLikeWin"><div class="firstViewWinTop"><div><div class="firstViewWinRole">主軸</div><div class="firstViewWinName">未確定</div></div><div class="firstViewWinStatus bad">未確定</div></div><div class="firstViewWinSummary">軸になるカードがまだ少ない状態です。まず使いやすい攻撃・防御・ドローから方向性を作ります。</div></div>`;
+      root.innerHTML = `<div class="firstViewWinCard main starterLikeWin"><div class="firstViewWinTop"><div class="firstViewWinMeta"><div class="firstViewWinRole">主軸</div><div class="firstViewWinStatus bad">未確定</div></div><div class="firstViewWinBody"><div class="firstViewWinName">未確定</div><div class="firstViewWinSummary">軸になるカードがまだ少ない状態です。まず使いやすい攻撃・防御・ドローから方向性を作ります。</div></div></div></div>`;
       if(note) note.textContent = '';
       return;
     }
     const axes=getFirstViewWinAxes(a);
     const cards=[];
-    if(axes.main) cards.push(renderFirstViewWinCard(axes.main,'主軸','main'));
-    if(axes.sub) cards.push(renderFirstViewWinCard(axes.sub,'補助','sub'));
-    root.innerHTML=cards.length ? cards.join('') : `<div class="firstViewWinCard main"><div class="firstViewWinTop"><div><div class="firstViewWinRole">主軸</div><div class="firstViewWinName">主軸未確定</div></div><div class="firstViewWinStatus bad">未確定</div></div><div class="firstViewWinSummary">まだ明確な勝ち筋が見えていません。主軸になる軸札と支え札を増やしたい状態です。</div></div>`;
+    if(axes.main) cards.push(renderFirstViewWinCard(axes.main,'主軸','main', a));
+    if(axes.sub) cards.push(renderFirstViewWinCard(axes.sub,'補助','sub', a));
+    root.innerHTML=cards.length ? cards.join('') : `<div class="firstViewWinCard main"><div class="firstViewWinTop"><div class="firstViewWinMeta"><div class="firstViewWinRole">主軸</div><div class="firstViewWinStatus bad">未確定</div></div><div class="firstViewWinBody"><div class="firstViewWinName">主軸未確定</div><div class="firstViewWinSummary">まだ明確な勝ち筋が見えていません。主軸になる軸札と支え札を増やしたい状態です。</div></div></div></div>`;
     if(note){
       note.textContent = '';
     }
   }
+  function clearCapableStateImpl159(a, tags){
+    const evalInfo = (a && a.actEvaluation) || {};
+    const rank = String(evalInfo.rank || '').toUpperCase();
+    const evalScore = Number(evalInfo.score) || 0;
+    const actRaw = String(evalInfo.act || evalInfo.label || (typeof currentAct !== 'undefined' ? currentAct : 'act1') || 'act1').toLowerCase();
+    const actKey = /3/.test(actRaw) ? 'act3' : (/2/.test(actRaw) ? 'act2' : 'act1');
+    const ms = (a && a.mainScores) || {};
+    const scoreOf = key => Number(ms[key]) || 0;
+    const fire = scoreOf('火力');
+    const defense = scoreOf('防御');
+    const draw = scoreOf('ドロー');
+    const energy = scoreOf('エナジー');
+    const scale = scoreOf('スケール');
+    const action = scoreOf('行動数');
+    const rotation = Number((a && a.deckRotationScore) || action || 0);
+    const accident = scoreOf('事故率');
+    const wc = (a && a.winCondition) || {};
+    const validation = (a && (a.characterWinValidation || a.silentWinValidation || a.characterAnalysis)) || {};
+    const axes = []
+      .concat(Array.isArray(wc.axes) ? wc.axes : [])
+      .concat(Array.isArray(wc.rows) ? wc.rows : [])
+      .concat(Array.isArray(wc.silentAxes) ? wc.silentAxes : [])
+      .concat(Array.isArray(validation.winConditionAxes) ? validation.winConditionAxes : [])
+      .concat(Array.isArray(validation.axes) ? validation.axes : [])
+      .filter(Boolean);
+    const scoreOfAxis = axis => Number(axis && (axis.score ?? axis.completion ?? axis.value)) || 0;
+    const axisNameText = axis => String((axis && (axis.name || axis.title || axis.label || axis.key)) || '');
+    const axisStateText = axis => String((axis && (axis.state && (axis.state.label || axis.state))) || axis?.status || axis?.stage || axis?.rank || '');
+    const axisRankText = axis => String((axis && (axis.rank || axis.grade || axis.state && axis.state.rank)) || '');
+    const strictAxisEstablished = axes.some(axis => {
+      const state = axisStateText(axis);
+      const rankText = axisRankText(axis).toUpperCase();
+      const score = scoreOfAxis(axis);
+      return /成立|完成|完了|確立|active|established|complete/i.test(state)
+        || /^(S|A)$/.test(rankText)
+        || score >= 72;
+    });
+    const formingOnlyAxes = axes.filter(axis => {
+      const state = axisStateText(axis);
+      const score = scoreOfAxis(axis);
+      return /形成中|途中|未成立|不足|準備|接続不足|B|C|forming|partial|missing/i.test(state) || (score >= 35 && score < 68);
+    }).length;
+    const winScore = Math.max(
+      Number(wc.completion) || 0,
+      Number(validation.completion) || 0,
+      Number(validation.mainAxis && validation.mainAxis.score) || 0,
+      axes.reduce((m, axis) => Math.max(m, scoreOfAxis(axis)), 0)
+    );
+    const tagList = Array.isArray(tags) ? tags : [];
+    const tagName = t => String((t && t.name) || t || '');
+    const tagScore = t => Number((t && t.score) || 0);
+    const tagCls = t => typeof severityClass === 'function' ? severityClass(t) : String(t && t.className || '');
+    const issueTags = tagList.filter(t => /fatal|danger/.test(tagCls(t)));
+    const criticalTags = issueTags.filter(t => {
+      const name = tagName(t);
+      const score = tagScore(t);
+      return score >= 70 && /事故|未成立|接続不足|決定力|再現性|防御|ブロック|火力|打点|AoE|全体|スケール|長期|ドロー|回転|循環|圧縮|エナジー|重量/.test(name);
+    });
+    const hardFatalRaw = tagList.filter(t => {
+      const cls = tagCls(t);
+      const name = tagName(t);
+      const score = tagScore(t);
+      return cls === 'fatal' && score >= 82 && /事故|未成立|接続不足|決定力|防御|ブロック|火力|打点|AoE|全体|複数|横並び|スケール|ドロー|回転|エナジー/.test(name);
+    });
+
+    const cardList = (typeof deck !== 'undefined' && Array.isArray(deck)) ? deck : (Array.isArray(window.deck) ? window.deck : []);
+    const cardText = cardList.map(c => String((c && (c.nameJa || c.name || c.id || c.nameEn)) || '')).join(' / ');
+    const hasCard = re => re.test(cardText);
+    const countCard = re => (cardText.match(re) || []).length;
+    const exhaustEnablerCount = countCard(/セカンドウィンド|鬼火|堕落|戦いのドラム|second_wind|fiend_fire|corruption|battle_drum/gi);
+    const exhaustPayoffCount = countCard(/無痛|堕落|鬼火|feel_no_pain|corruption|fiend_fire/gi);
+    const blockCoreCount = countCard(/バリケード|ボディスラム|ジャガーノート|不動|武装解除|受け流し|barricade|body_slam|juggernaut|impervious|disarm|shrug/gi);
+    const strengthCoreCount = countCard(/悪魔化|発火|リミットブレイク|ツインストライク|死神|demon_form|inflame|limit_break|twin_strike|reaper/gi);
+    const drawAccessCount = countCard(/供物|ポンメルストライク|戦いのドラム|offer|offering|pommel|battle_drum/gi);
+    const silentShivGenCount = countCard(/剣の舞|外套と短剣|silent_blade_dance|silent_cloak_and_dagger/gi);
+    const silentShivPayoffCount = countCard(/精度上昇|とどめの一撃|残像|silent_accuracy|silent_finisher|silent_after_image/gi);
+    const silentSupportCount = countCard(/アドレナリン|アクロバット|バックフリップ|フットワーク|ブラー|足払い|金切り声|残像|silent_adrenaline|silent_acrobatics|silent_backflip|silent_footwork|silent_blur|silent_leg_sweep|silent_piercing_wail|silent_after_image/gi);
+    const silentKnifeCompletePackage = silentShivGenCount >= 2 && silentShivPayoffCount >= 2 && silentSupportCount >= 4;
+    const exhaustPackage = hasCard(/堕落|corruption/i) && hasCard(/無痛|feel_no_pain/i) && exhaustEnablerCount >= 3;
+    const blockFinishPackage = hasCard(/バリケード|barricade/i) && hasCard(/ボディスラム|body_slam/i) && blockCoreCount >= 4;
+    const strengthFinishPackage = hasCard(/悪魔化|demon_form/i) && (hasCard(/リミットブレイク|limit_break/i) || hasCard(/発火|inflame/i)) && (hasCard(/ツインストライク|twin_strike/i) || hasCard(/死神|reaper/i));
+    const ironcladCompletePackage = exhaustPackage || blockFinishPackage || strengthFinishPackage || (exhaustPackage && blockCoreCount >= 3) || (blockFinishPackage && drawAccessCount >= 1);
+
+    const character = String((a && (a.character || a.hero)) || (validation && validation.character) || '').toLowerCase();
+    const isIronclad = !character || /ironclad|アイアン|clad/.test(character);
+    const isRegent = /regent/.test(character);
+    const isSilent = /silent/.test(character);
+    const impl162Package = a && a.impl162CompletePackage;
+    const impl162Complete = !!(impl162Package && impl162Package.complete);
+    const completePackage = impl162Complete || (isIronclad && ironcladCompletePackage) || (isSilent && silentKnifeCompletePackage);
+    const mainSupportEstablished = !!(completePackage && (
+      (impl162Package && impl162Package.primary && Array.isArray(impl162Package.supports) && impl162Package.supports.length > 0)
+      || (isIronclad && ((blockFinishPackage && (exhaustPackage || drawAccessCount >= 1)) || (exhaustPackage && blockCoreCount >= 3) || (strengthFinishPackage && defense >= 50)))
+      || (isSilent && silentKnifeCompletePackage)
+    ));
+    const isAoeOnlyIssue = t => /AoE|全体|複数|横並び/.test(tagName(t));
+    const criticalTagsForClear = mainSupportEstablished ? criticalTags.filter(t => !isAoeOnlyIssue(t)) : criticalTags;
+    const issueTagsForClear = mainSupportEstablished ? issueTags.filter(t => !isAoeOnlyIssue(t)) : issueTags;
+    const hardFatal = hardFatalRaw.some(t => !(mainSupportEstablished && isAoeOnlyIssue(t)));
+
+    // impl164: クリア圏内は総合評価A以上のときだけ許可する。
+    // scoreだけの到達や完成パッケージだけでは、総合診断をクリア圏内に上げない。
+    const rankAOrBetter = (rank === 'S' || rank === 'A');
+    const actStrong = rankAOrBetter && evalScore >= (actKey === 'act1' ? 70 : 72);
+    const actPass = actStrong;
+    const baseCoreCount = [fire >= 58, defense >= 58, scale >= 55, draw >= 44 || rotation >= 48, energy >= 42 || action >= 48].filter(Boolean).length;
+    const completeCoreCount = [fire >= 52, defense >= 56, scale >= 50, draw >= 38 || rotation >= 42 || drawAccessCount >= 1, energy >= 38 || action >= 44].filter(Boolean).length;
+    const coreStrong = impl162Complete ? true : (completePackage
+      ? (completeCoreCount >= 4 && fire >= 46 && defense >= 50 && scale >= 46)
+      : (baseCoreCount >= 4 && fire >= 58 && defense >= 56 && scale >= 52));
+    const stableEnough = accident <= (completePackage ? 62 : 50)
+      && !(draw < (completePackage ? 28 : 32) && defense < 45)
+      && !(energy < (completePackage ? 28 : 32) && action < 42)
+      && !hardFatal;
+    const criticalBlock = criticalTagsForClear.length >= (completePackage ? 4 : 1)
+      || issueTagsForClear.filter(t => tagScore(t) >= 72).length >= (completePackage ? 5 : 2);
+    const completedWinPlan = impl162Complete ? true : (isIronclad
+      ? ironcladCompletePackage
+      : (isSilent ? silentKnifeCompletePackage || (strictAxisEstablished && winScore >= 72) : (strictAxisEstablished && winScore >= 68)));
+    const hasWinPlan = isIronclad
+      ? completedWinPlan
+      : (isSilent ? completedWinPlan : (completedWinPlan || (strictAxisEstablished && winScore >= 72)));
+    const formingOnlyBlock = !completePackage && !completedWinPlan && (formingOnlyAxes > 0 || /形成中|未成立|接続不足|不足/.test(String(validation && (validation.conclusion || validation.summary || ''))));
+    const allowClear = !!(a
+      && actPass
+      && coreStrong
+      && stableEnough
+      && hasWinPlan
+      && !criticalBlock
+      && !formingOnlyBlock
+      && !(typeof isStarterLikeDeckForDisplay === 'function' && isStarterLikeDeckForDisplay(a)));
+    return {
+      clear: allowClear,
+      winScore,
+      coreCount: baseCoreCount,
+      actStrong: actPass,
+      stableEnough,
+      completedWinPlan,
+      completePackage: completePackage,
+      blockers: {critical: criticalTagsForClear.map(tagName), formingOnly: formingOnlyBlock, aoeSoftened: mainSupportEstablished && criticalTags.length !== criticalTagsForClear.length}
+    };
+  }
+  window.clearCapableStateImpl159 = clearCapableStateImpl159;
+
   function renderHeroChartSummary(a){
     const tags=tagsOf(a);
     const winEl=document.getElementById('heroWinCondition');
@@ -19453,9 +19768,12 @@ function renderFlexibleWinConditionPanel(rows, scores){
     const needEl=document.getElementById('firstViewNeedList');
     const wc=a?.winCondition || {};
     const score=Math.max(0,Math.min(100,Math.round(Number(wc.completion ?? a?.actEvaluation?.score)||0)));
-    const topDangers=tags.filter(t=>t.className==='fatal'||t.className==='danger').slice(0,3);
-    const topLosses=(topDangers.length ? topDangers : tags.slice(0,3)).slice(0,3);
-    const topNeeds=tags.slice(0,3);
+    const clearState=clearCapableStateImpl159(a,tags);
+    let topDangers=tags.filter(t=>t.className==='fatal'||t.className==='danger').slice(0,3);
+    let topLosses=(topDangers.length ? topDangers : tags.slice(0,3)).slice(0,3);
+    let topNeeds=tags.slice(0,3);
+    // impl165: クリア圏内でも不足タグ・注意タグは一律で表示する。
+    // 総合診断やデッキ名で弱点を主役にしすぎないだけで、タグ自体は消さない。
     const winName=wc.mainAxis || getMainWinName(a);
     const subAxes=Array.isArray(wc.subAxes) ? wc.subAxes : [];
     if(winEl){
@@ -19507,7 +19825,8 @@ function renderFlexibleWinConditionPanel(rows, scores){
       (defenseScore < 34 && (drawScore < 45 || rotationScore < 42)) ||
       (topScore >= 70 && /ドロー|回転|循環|防御|ブロック|エナジー|重量/.test(topName))
     );
-    const strong=(!top || Number(top.score||0)<38) && (a?.actEvaluation?.score||0)>=72;
+    const clearState = (typeof clearCapableStateImpl159 === 'function') ? clearCapableStateImpl159(a, tags) : {clear:false};
+    const strong = !!((a && (a.isClearCapable || /^(A|S)$/i.test(String(a.overallRank||'')) && /クリア圏内/.test(String((a.diagnosis&& (a.diagnosis.label||a.diagnosis.overallLabel||a.diagnosis.summary))||'')))) || (clearState && clearState.clear));
     const reasonFor=function(t){
       const name=String(t?.name||'');
       if(/全体|AoE|複数/.test(name)) return '複数戦の処理が遅く、横並びの敵で被弾が増えやすい';
@@ -19519,23 +19838,62 @@ function renderFlexibleWinConditionPanel(rows, scores){
       if(/火力|打点|単体/.test(name)) return '敵を倒し切れず、危険なターンを何度も迎えやすい';
       return t?.reasons?.[0] || '今の構造だと勝ち筋につながるまでに隙が出やすい';
     };
+    const actKey=/Act3|act3/i.test(label) ? 'act3' : (/Act2|act2/i.test(label) ? 'act2' : 'act1');
+    const allTags=[top, second].concat((tags||[]).slice(2)).filter(Boolean);
+    const pickBy=function(re){
+      return allTags.find(t=>re.test(String(t?.name||''))) || null;
+    };
+    const act2Tag=pickBy(/AoE|全体|複数|横並び|防御|ブロック|継続防御|状態異常|高火力|エナジー|重量|重い/);
+    const act3Tag=pickBy(/スケール|長期|伸び|圧縮|ドロー|回転|循環|決定力|ボス|火力|打点|単体/);
+    const act1Tag=pickBy(/初動|事故|火力|打点|軽量|防御|ブロック|ドロー|エリート/);
     if(strong){
+      const strongSub = actKey === 'act3'
+        ? 'Act3では致命的な負け筋は目立ちません。次はボス戦の決定力・再現性・防御の維持を確認すると安定します。'
+        : actKey === 'act2'
+          ? 'Act2では致命的な負け筋は目立ちません。次はAoE・継続防御・高火力連打への耐性を確認すると安定します。'
+          : 'Act1では致命的な負け筋は目立ちません。次はエリート前の火力と初動防御を整えると安定します。';
       return {
-        headline:'大きな穴は少なめです。',
-        sub:`${label}では致命的な負け筋は目立ちません。次は勝ち筋の完成度を上げ、ボス戦で押し切れる形に寄せると安定します。`
+        headline:'クリア圏内',
+        sub:'主要な勝ち筋が成立しており、火力・防御・スケールも高い水準です。大きな補強よりも、無理なルート選択・事故率を上げないピック・プレイ判断のブレに注意したい状態です。'
       };
     }
     if(severeSetupRisk){
-      const causes=[top, second].filter(Boolean).map(reasonFor).filter(Boolean);
+      if(actKey === 'act2'){
+        const focus=act2Tag || top || second;
+        return {
+          headline:'Act2で横並び・高火力に削られやすいデッキです。',
+          sub:`${reasonFor(focus)}。Act2では、AoE・継続防御・ドロー/エナジー接続を優先して補うと安定します。`
+        };
+      }
+      if(actKey === 'act3'){
+        const focus=act3Tag || top || second;
+        return {
+          headline:'Act3で決定力・再現性が不足しやすいデッキです。',
+          sub:`${reasonFor(focus)}。Act3では、スケール・圧縮・ドロー・ボス火力のどれかを補い、重要札へ届く形に寄せたい状態です。`
+        };
+      }
+      const causes=[act1Tag || top, second].filter(Boolean).map(reasonFor).filter(Boolean);
       return {
         headline:'回る前に崩れやすいデッキです。',
-        sub:`${causes[0] || '必要カードに届く前に崩れやすい'}。${label}では、早い段階でドロー・軽い防御・使いやすい攻撃を補うと安定します。`
+        sub:`${causes[0] || '必要カードに届く前に崩れやすい'}。Act1では、早い段階で軽い攻撃・初動防御・ドローを補うと安定します。`
+      };
+    }
+    if(actKey === 'act2' && act2Tag){
+      return {
+        headline:/AoE|全体|複数|横並び/.test(String(act2Tag.name||'')) ? 'Act2の横並びで押し込まれやすいデッキです。' : 'Act2の高火力連打で削られやすいデッキです。',
+        sub:`${reasonFor(act2Tag)}。Act2では、AoE・継続防御・状態異常対策のどれかを優先して確認したい状態です。`
+      };
+    }
+    if(actKey === 'act3' && act3Tag){
+      return {
+        headline:/スケール|長期|伸び|決定力|ボス/.test(String(act3Tag.name||'')) ? 'Act3の長期戦で押し負けやすいデッキです。' : 'Act3で重要札への到達が不安なデッキです。',
+        sub:`${reasonFor(act3Tag)}。Act3では、スケール・圧縮・ドロー・決定力を優先して補うとボス戦の再現性が上がります。`
       };
     }
     if(/全体|AoE|複数/.test(topName) || (!setupRiskTag && /全体|AoE|複数/.test(text))){
       return {
         headline:'複数敵で押しつぶされやすいデッキです。',
-        sub:`${reasonFor(top)}。${label}では、横並びの敵を早く減らせる全体攻撃や手数を優先したい状態です。`
+        sub:`${reasonFor(top)}。${label}では、横並びの敵を早く減らせるAoEや手数を優先したい状態です。`
       };
     }
     if(/スケール|長期|伸び/.test(topName) || (!setupRiskTag && /スケール|長期|伸び/.test(text))){
@@ -19551,10 +19909,24 @@ function renderFlexibleWinConditionPanel(rows, scores){
       };
     }
     if(setupRiskTag){
-      const causes=[top, second].filter(Boolean).map(reasonFor).filter(Boolean);
+      if(actKey === 'act2'){
+        const focus=act2Tag || top || second;
+        return {
+          headline:'Act2で受け切る前に削られやすいデッキです。',
+          sub:`${reasonFor(focus)}。Act2では、横並び処理・継続防御・高火力連打への耐性を優先して確認してください。`
+        };
+      }
+      if(actKey === 'act3'){
+        const focus=act3Tag || top || second;
+        return {
+          headline:'Act3で勝ち筋の再現性に不安があるデッキです。',
+          sub:`${reasonFor(focus)}。Act3では、重要札へ届くドロー/圧縮と、ボスを削り切る決定力を優先して補いたい状態です。`
+        };
+      }
+      const causes=[act1Tag || top, second].filter(Boolean).map(reasonFor).filter(Boolean);
       return {
         headline:'動きの安定性に不安があるデッキです。',
-        sub:`${causes[0] || '必要カードに届くまでが遅い'}。ただし、即死級の問題とは限らないため、今の勝ち筋に合わせて不足役割を補ってください。`
+        sub:`${causes[0] || '必要カードに届くまでが遅い'}。Act1では、初動火力・軽い防御・ドローを優先すると被弾を減らしやすいです。`
       };
     }
     return {
@@ -19591,8 +19963,13 @@ function renderFlexibleWinConditionPanel(rows, scores){
     const headline=document.getElementById('priorityHeadline');
     const sub=document.getElementById('prioritySub');
     const cards=document.getElementById('priorityMissingCards');
+    const hero=document.querySelector('.priorityHero');
     const tags=tagsOf(a);
     const summary=naturalPrioritySummary(a, tags);
+    const isClearCapableSummary = summary && summary.headline === 'クリア圏内';
+    if(hero){
+      hero.classList.toggle('clearCapable', !!isClearCapableSummary);
+    }
     if(headline){
       headline.textContent = summary.headline;
     }
@@ -19600,7 +19977,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
       sub.textContent = summary.sub;
     }
     if(cards){
-      const activeTags=tags.filter(t=>severityClass(t)!=='ok');
+      const activeTags = tags.filter(t=>severityClass(t)!=='ok');
       const rows=(activeTags.length ? activeTags : tags);
       const html = rows.length ? rows.map(renderShortageItem).join('') : renderShortageItem({name:'大きな穴は少なめ', className:'ok', severity:'安定', reasons:['今は勝ち筋を伸ばす段階です。']});
       cards.innerHTML = `<div class="firstViewWeakTagRow">${html}</div>`;
@@ -19835,6 +20212,12 @@ function renderFlexibleWinConditionPanel(rows, scores){
     const highCostCount=deckCount(cards,c=>Number(c.cost)>=2 || c.xCost);
     const frontCount=deckCount(cards,c=>hasTag(c,'フロントロード'));
     const aoeCount=deckCount(cards,c=>hasTag(c,'AoE攻撃') || hasTag(c,'AoE毒'));
+    const isSilentDeckForPoison = deckCount(cards,c=>String(c && c.character || '').toLowerCase() === 'silent') > 0;
+    const poisonCardForFloating = c => isSilentDeckForPoison && (hasTag(c,'毒') || hasTag(c,'毒起動札') || hasTag(c,'毒コンボ札') || Number(c.poison)>0 || c.catalystMultiplier || /致死毒|有毒ガス|バウンドフラスコ|腐食の波|触媒|毒の一刺し|Deadly Poison|Noxious Fumes|Bouncing Flask|Catalyst/i.test(cardName(c)));
+    const poisonCoreForFloating=deckCount(cards,c=>poisonCardForFloating(c));
+    const poisonAccelForFloating=deckCount(cards,c=>c && (c.catalystMultiplier || hasTag(c,'毒コンボ札') || /触媒|Catalyst/i.test(cardName(c))));
+    const poisonDefenseForFloating=deckCount(cards,c=>c && String(c.character||'').toLowerCase()==='silent' && (c.block || hasTag(c,'防御') || hasTag(c,'防御補助') || hasTag(c,'継戦補助') || hasTag(c,'ドロー') || /足払い|金切り声|フットワーク|ブラー|バックフリップ|残像|Leg Sweep|Piercing Wail|Footwork|Blur|Backflip|After Image/i.test(cardName(c))));
+    const poisonDurabilityEstablishedForFloating = poisonCoreForFloating >= 2 && (poisonAccelForFloating >= 1 || poisonCoreForFloating >= 3) && poisonDefenseForFloating >= 3;
     const avgBlock=Number(s.avgBlock)||0;
     const avgDamage=Number(s.avgDamage)||0;
     const rotation=Number(s.deckRotationScore)||0;
@@ -19879,7 +20262,10 @@ function renderFlexibleWinConditionPanel(rows, scores){
         pushIssue(out,c,{score:78, category:'重量級の支援不足', reason:'高コストカードですが、エナジー・ドロー支援が少なく、必要なターンに使えない可能性があります。', support:['エナジー補助','ドロー','0コスト','コスト軽減'], action:'高コストを増やすより、まず支える基盤を補うと事故率が下がります。'});
       }
       if((hasTag(c,'長期スケーリング') || hasTag(c,'スケーリング') || c.type==='power') && frontCount < 4 && avgDamage < 14){
-        pushIssue(out,c,{score:62, category:'セットアップ前の初動不足', reason:'長期戦では強いカードですが、序盤火力が薄く、セットアップ前に押し負ける可能性があります。', support:['軽量火力','フロントロード','初動防御','全体攻撃性能'], action:'Act1〜2では、先に短期火力や防御を補ってから活かします。'});
+        // impl165: 毒軸は短期火力だけで浮き札扱いしない。
+        // 毒付与/加速と防御・耐久が成立している場合、基本毒カードは長期戦の勝ち筋として扱う。
+        if(poisonDurabilityEstablishedForFloating && poisonCardForFloating(c)) return;
+        pushIssue(out,c,{score:62, category:'セットアップ前の初動不足', reason:'長期戦では強いカードですが、序盤火力が薄い場合は成立前に押し切られやすいです。', support:['軽量火力','フロントロード','初動防御','AoE性能'], action:'Act1〜2では、先に短期火力や防御を補ってから活かします。'});
       }
       if(hasTag(c,'AoE攻撃') && aoeCount >= 3 && avgDamage < 15){
         pushIssue(out,c,{score:45, category:'役割重複', reason:'全体攻撃札は足りており、単体火力やスケール不足の方が問題になりやすい状態です。', support:['単体火力','スケール','フィニッシャー'], action:'追加全体攻撃性能より、ボス・エリート向けの火力変換を優先します。'});
@@ -19928,7 +20314,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
           </div>
           <div class="floatingDetailText"><b>理由：</b>${esc(x.reason)}</div>
           <div class="floatingDetailSupport">${(x.support||[]).slice(0,5).map(s=>`<span class="floatingSupportChip">${esc(s)}</span>`).join('')}</div>
-          <div class="floatingActionText"><b>次の行動：</b>${esc(x.action)}</div>
+          ${String(x.action||'').trim() ? `<div class="floatingActionText"><b>次の行動：</b>${esc(x.action)}</div>` : ''}
         </div>`).join('')}
       </div>
     </div>`;
@@ -19947,481 +20333,14 @@ function renderFlexibleWinConditionPanel(rows, scores){
 })();
 </script>
 
-<script>
-// implementation16-win-condition-card-readability-fix-v1
-(function(){
-  function esc(v){return String(v ?? '').replace(/[&<>\"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[ch] || ch));}
-  function shortAxisName(name){
-    const s=String(name||'勝ち筋');
-    return s
-      .replace('フロントロード軸','フロント軸')
-      .replace('防御スケール軸','防御軸')
-      .replace('ランプ / 重量カード軸','エナジー軸')
-      .replace('ランプ／重量カード軸','エナジー軸')
-      .replace('ランプ / 重量軸','エナジー軸')
-      .replace('エナジー軸','エナジー軸')
-      .replace('長期スケール軸','長期軸')
-      .replace('グッドスタッフ軸','汎用軸')
-      .replace('自傷軸','自傷軸')
-      .replace('廃棄軸','廃棄軸');
-  }
-  function iconFor(name){
-    const s=String(name||'');
-    if(/フロント|火力/.test(s)) return '🔥';
-    if(/防御|ブロック/.test(s)) return '🛡️';
-    if(/ランプ|重量|エナジー/.test(s)) return '⚡';
-    if(/筋力/.test(s)) return '💪';
-    if(/廃棄|Exhaust/.test(s)) return '🌀';
-    if(/傷口|自傷/.test(s)) return '🩸';
-    if(/AoE/.test(s)) return '💥';
-    if(/長期|スケール/.test(s)) return '📈';
-    return '🧩';
-  }
-  function statusClass(status){
-    const s=String(status||'');
-    if(/成立$|十分|安定/.test(s) && !/未成立/.test(s)) return 'ok';
-    if(/途中|不足|弱い|注意/.test(s)) return 'mid';
-    return 'bad';
-  }
-  function detailBlock(title, html){
-    return `<div class="lightDetails alwaysVisibleDetails"><div class="lightDetailsSummary detailStaticLabel">${esc(title)}</div><div class="lightDetailsBody">${html}</div></div>`;
-  }
-  function normalizeCards(rows){
-    const base = (typeof normalizeWinConditionCards === 'function')
-      ? normalizeWinConditionCards(rows)
-      : (rows || []).map(r=>({name:r.name||r.axis||'勝ち筋',status:r.status||r.state||'未成立',statusClass:statusClass(r.status||r.state),summary:r.summary||r.reason||'',strengths:r.strengths||[],challenges:r.challenges||r.needs||[],tags:r.tags||r.needs||[]}));
-    return base.map(c=>({...c, displayName:shortAxisName(c.name), icon:iconFor(c.name)}));
-  }
-  window.renderFlexibleWinConditionPanel = function(rows, scores){
-    const cards=normalizeCards(rows);
-    return `<div class="silentWinCompactPanel winConditionPanel">
-      <div class="silentWinCompactTitle">勝ち筋分類</div>
-      <div class="silentWinCompactLead">各カードは「何軸か・成立しているか」を優先表示します。根拠は下に常時表示します。</div>
-      <div class="silentWinCompactGrid winConditionGrid">
-        ${cards.map(card=>{
-          const cls=card.statusClass || statusClass(card.status);
-          const strengths=(Array.isArray(card.strengths)?card.strengths:[card.strengths]).filter(Boolean).slice(0,3);
-          const challenges=(Array.isArray(card.challenges)?card.challenges:[card.challenges]).filter(Boolean).slice(0,3);
-          const tags=(card.tags && card.tags.length ? card.tags : [card.status]).slice(0,3);
-          const axisSummary = typeof nonSilentWinAxisDescription === 'function' ? nonSilentWinAxisDescription(card.name, card.summary) : (card.summary || 'このデッキがどの勝ち筋へ向かっているかを確認する軸です。');
-          const detail=`<b>要約</b><br>${esc(axisSummary)}<br><br><b>強み</b><ul>${strengths.map(x=>`<li>${esc(x)}</li>`).join('') || '<li>軸の方向性を確認できます</li>'}</ul><b>課題</b><ul>${challenges.map(x=>`<li>${esc(x)}</li>`).join('') || '<li>必要な補助札を確認してください</li>'}</ul>`;
-          return `<div class="silentWinMiniCard winConditionCard ${cls}">
-            <div class="silentWinMiniHead winConditionHead">
-              <div class="silentWinMiniName winConditionName" title="${esc(card.name)}">${card.icon} ${esc(card.displayName)}</div>
-              <span class="silentWinMiniStatus winConditionStatus ${cls}">${esc(card.status||'未成立')}</span>
-            </div>
-            <div class="silentWinMiniSummary winConditionSummary">${esc(axisSummary)}</div>
-            <div class="silentWinMiniNeeds winConditionTags">${tags.map(t=>`<span class="silentWinNeedChip winConditionTag">${esc(t)}</span>`).join('')}</div>
-            ${detailBlock('詳細', detail)}
-          </div>`;
-        }).join('')}
-      </div>
-      ${typeof renderSupportAbilityPanel === 'function' ? renderSupportAbilityPanel(scores) : ''}
-    </div>`;
-  };
-  window.renderCharacterWinConditionValidation = function(validation){
-    if(!validation) return '';
-    function axisText(axis){ return String((axis && (axis.name || axis.title || axis.axis || axis.key)) || ''); }
-    function axisKey(axis){ return String((axis && (axis.key || axis.name || axis.title || axis.axis)) || '').toLowerCase(); }
-    function findAxis(axes, pattern){ return (Array.isArray(axes) ? axes : []).find(function(axis){ return pattern.test(axisText(axis) + ' ' + axisKey(axis)); }); }
-    function cloneMajor(axis, label, key, summary){
-      return Object.assign({}, axis || {}, {name:label, title:label, axis:label, key:key, score:Number(axis && axis.score) || 0, summary:(axis && (axis.summary || axis.reason)) || summary, reason:(axis && (axis.summary || axis.reason)) || summary});
-    }
-    function majorAxes(){
-      if(Array.isArray(validation.majorAxisCheck) && validation.majorAxisCheck.length) return validation.majorAxisCheck;
-      var axes = Array.isArray(validation.axes) ? validation.axes : [];
-      if(validation.character === 'silent'){
-        return [
-          cloneMajor(findAxis(axes, /poison|毒/), '毒軸', 'poison', '毒付与・毒加速・耐久がどれくらいつながっているかを確認します。'),
-          cloneMajor(findAxis(axes, /shiv|ナイフ/), 'ナイフ軸', 'shiv', 'ナイフ生成・手数・火力変換がどれくらいつながっているかを確認します。'),
-          cloneMajor(findAxis(axes, /discard|slide|スライ/), 'スライ軸', 'スライ', 'スライ起動札・コンボ札・循環がどれくらいつながっているかを確認します。')
-        ];
-      }
-      if(validation.character === 'ironclad'){
-        return [
-          cloneMajor(findAxis(axes, /strength|筋力|筋肉/), '筋肉軸', 'strength', '筋肉供給と火力変換がどれくらいつながっているかを確認します。'),
-          cloneMajor(findAxis(axes, /exhaust|廃棄/), '廃棄軸', '廃棄', '廃棄手段と廃棄で得をするカードがどれくらいつながっているかを確認します。'),
-          cloneMajor(findAxis(axes, /block|defense|防御|ブロック/), '防御軸', 'block', '防御量・ブロック変換・長期戦性能がどれくらいつながっているかを確認します。'),
-          cloneMajor(findAxis(axes, /vulnerable|弱体|威圧|無慈悲/), '弱体軸', 'vulnerable', '威圧を中心に、弱体を防御・安定・突破力へ変換できているかを確認します。')
-        ];
-      }
-      return [];
-    }
-    function stateFor(axis){
-      var score = Number(axis && axis.score) || 0;
-      if(validation.character === 'silent' && /スライ|discard|slide/.test(axisText(axis) + ' ' + axisKey(axis))){
-        var axesForTop = Array.isArray(validation.axes) ? validation.axes : [];
-        var top = validation.mainAxis || axesForTop.slice().sort(function(a,b){ return (Number(b && b.score)||0) - (Number(a && a.score)||0); })[0];
-        var topText = axisText(top) + ' ' + axisKey(top);
-        if(top && !/スライ|discard|slide/.test(topText) && /ナイフ|shiv/.test(topText)) score = Math.min(score, 64);
-      }
-      return typeof winConditionState === 'function' ? winConditionState(score) : {cls:statusClass(axis && axis.status), label:(axis && axis.status)||'未成立'};
-    }
-    function renderLocalAxis(axis){
-      const st = stateFor(axis);
-      const name=shortAxisName(axis.name || '未判定');
-      const summary = validation.character === 'silent' && typeof compactSilentSummary === 'function' ? compactSilentSummary(axis) : (typeof nonSilentWinAxisDescription === 'function' ? nonSilentWinAxisDescription(axis.name, axis.summary || axis.reason) : (typeof summarizeGenericAxis === 'function' ? summarizeGenericAxis(axis) : axis.summary || axis.reason || 'このデッキがどの勝ち筋へ向かっているかを確認する軸です。'));
-      const axisProfile = typeof axisProfileByName === 'function' ? axisProfileByName(axis) : null;
-      const needs=(axisProfile?.tags?.length ? axisProfile.tags : (axis.needs?.length ? axis.needs : ['大きな不足なし'])).slice(0,3);
-      return `<div class="winAxisCard ${st.cls}">
-        <div class="winAxisHead">
-          <div class="winAxisName" title="${esc(axis.name || '未判定')}">${iconFor(axis.name)} ${esc(name)}</div>
-          <div class="winAxisStatus ${st.cls}">${esc(st.label || '未成立')}</div>
-        </div>
-        <div class="winAxisSummary">${esc(summary)}</div>
-        <div class="winAxisTags">${needs.map((n,i)=>`<span class="winAxisTag ${i===0 && axis.needs?.length ? 'priority' : ''}">${esc(n)}</span>`).join('')}</div>
-      </div>`;
-    }
-    function validWinAxis(axis){
-      if(!axis || axis._fallback) return false;
-      var name = axisText(axis);
-      if(!name || /未判定|未成立|まだ何者でもない|石に変える準備|静かな循環|崩れない壁|不完全燃焼|噛み合い不足/.test(name)) return false;
-      return (Number(axis.score) || 0) >= 35;
-    }
-    var winSource = Array.isArray(validation.winConditionAxes) ? validation.winConditionAxes : (Array.isArray(validation.axes) ? validation.axes.filter(validWinAxis) : []);
-    if(!winSource.length) winSource = [{name:'主軸未確定', key:'unfixed', score:0, _fallback:true, summary:'成立している主軸はまだ見えていません。大軸チェックで伸びている方向を確認してください。', needs:['接続不足','主軸未確定']}];
-    const rows=winSource.map(renderLocalAxis).join('');
-    const majorRows=majorAxes().map(renderLocalAxis).join('');
-    return `<div class="winStructurePanel"><div class="winStructureTitle">勝ち筋分類</div><div class="winStructureLead">${esc(validation.conclusion||'勝ち筋の成立状況を確認します。')}</div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">勝ち筋</div><div class="winSectionHint">実際に勝ち筋として成立している軸</div></div><div class="winAxisGrid">${rows}</div></div>${majorRows ? `<div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">大軸チェック</div><div class="winSectionHint">未成立を含む主要軸の成立度</div></div><div class="winAxisGrid">${majorRows}</div></div>` : ''}</div>`;
-  };
-  // startup-stability: initial full rerender skipped; user actions render normally.
-})();
 
-/* implementation8-mobile-radar-render-fix-v1
-   SVGレーダーを、タブ表示・リサイズ・画面回転後に安全に再描画する */
-(function(){
-  function forceRadarRender(){
-    var radar = document.getElementById('radar');
-    if(!radar) return;
-
-    var wrap = radar.closest('.radarHeroWrap') || radar.parentElement;
-    var chart = radar.closest('.radarHeroChart');
-
-    if(wrap){
-      wrap.style.minHeight = window.matchMedia('(max-width: 760px)').matches ? '280px' : '260px';
-      wrap.style.height = 'auto';
-      wrap.style.display = 'flex';
-      wrap.style.overflow = 'visible';
-    }
-
-    if(chart){
-      chart.style.minHeight = window.matchMedia('(max-width: 760px)').matches ? '360px' : '340px';
-      chart.style.overflow = 'visible';
-    }
-
-    radar.style.display = 'block';
-    radar.style.visibility = 'visible';
-    radar.style.opacity = '1';
-    radar.setAttribute('width', window.matchMedia('(max-width: 760px)').matches ? '300' : '360');
-    radar.setAttribute('height', window.matchMedia('(max-width: 760px)').matches ? '260' : '310');
-    radar.setAttribute('viewBox', '0 0 300 260');
-
-    if(typeof renderRadar === 'function'){
-      try{ renderRadar(); }catch(e){}
-    }else if(typeof updateAnalysis === 'function'){
-      try{ updateAnalysis(); }catch(e){}
-    }
-  }
-
-  function scheduleRadarRender(){
-    requestAnimationFrame(function(){
-      forceRadarRender();
-      setTimeout(forceRadarRender, 80);
-      setTimeout(forceRadarRender, 240);
-    });
-  }
-
-  window.forceRadarRender = forceRadarRender;
-
-  document.addEventListener('DOMContentLoaded', scheduleRadarRender);
-  window.addEventListener('load', scheduleRadarRender);
-  window.addEventListener('resize', scheduleRadarRender);
-  window.addEventListener('orientationchange', function(){
-    setTimeout(scheduleRadarRender, 250);
-  });
-
-  document.addEventListener('click', function(e){
-    if(e.target && (e.target.classList.contains('appTabBtn') || e.target.closest('.appTabBtn'))){
-      setTimeout(scheduleRadarRender, 80);
-    }
-    if(e.target && (e.target.classList.contains('mobileCardToggle') || e.target.closest('.mobileCardToggle'))){
-      setTimeout(scheduleRadarRender, 80);
-    }
-  });
-
-  if(window.ResizeObserver){
-    var ro = new ResizeObserver(function(){ scheduleRadarRender(); });
-    document.addEventListener('DOMContentLoaded', function(){
-      var radar = document.getElementById('radar');
-      var chart = radar && radar.closest('.radarHeroChart');
-      if(chart) ro.observe(chart);
-    });
-  }
-})();
-
-</script>
+<!-- removed obsolete implementation16 win-condition render path: canonical detailed render remains in impl144/146/148 path -->
 
 
-<script>
-/* win-support-display-connection-fix-v4 */
-(function(){
-  function escText(v){
-    return String(v ?? '').replace(/[&<>"']/g, function(ch){
-      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
-    });
-  }
-
-  function safeState(score){
-    if(typeof winConditionState === 'function') return winConditionState(score);
-    const n = Number(score) || 0;
-    if(n >= 75) return {cls:'ok', label:'成立'};
-    if(n >= 45) return {cls:'mid', label:'途中'};
-    if(n >= 25) return {cls:'bad', label:'弱い'};
-    return {cls:'weak', label:'未成立'};
-  }
-
-  function safeAxisSummary(axis, validation){
-    if(validation && validation.character === 'silent' && typeof compactSilentSummary === 'function'){
-      return compactSilentSummary(axis);
-    }
-    if(typeof nonSilentWinAxisDescription === 'function'){
-      return nonSilentWinAxisDescription(axis.name, axis.summary || axis.reason);
-    }
-    if(typeof summarizeGenericAxis === 'function'){
-      return summarizeGenericAxis(axis);
-    }
-    return axis.summary || axis.reason || 'このデッキがどの勝ち筋へ向かっているかを確認する軸です。';
-  }
-
-  function renderConnectedWinValidation(validation){
-    if(!validation) return '';
-    if(validation.character === 'regent' && validation.regentEconomy && typeof renderRegentEconomyWinConditionPanel === 'function') return renderRegentEconomyWinConditionPanel(validation);
-
-    function axisText(axis){
-      return String((axis && (axis.name || axis.title || axis.axis || axis.key)) || '');
-    }
-    function axisKey(axis){
-      return String((axis && (axis.key || axis.name || axis.title || axis.axis)) || '').toLowerCase();
-    }
-    function stateForAxis(axis){
-      var score = Number(axis && axis.score) || 0;
-      if(validation.character === 'silent' && /スライ|discard|slide/.test(axisText(axis) + ' ' + axisKey(axis))){
-        var axesForTop = Array.isArray(validation.axes) ? validation.axes : [];
-        var top = validation.mainAxis || axesForTop.slice().sort(function(a,b){ return (Number(b && b.score)||0) - (Number(a && a.score)||0); })[0];
-        var topText = axisText(top) + ' ' + axisKey(top);
-        if(top && !/スライ|discard|slide/.test(topText) && /ナイフ|shiv/.test(topText)) score = Math.min(score, 64);
-      }
-      return typeof winConditionState === 'function' ? winConditionState(score) : safeState(score);
-    }
-    function findAxis(axes, pattern){
-      return (Array.isArray(axes) ? axes : []).find(function(axis){ return pattern.test(axisText(axis) + ' ' + axisKey(axis)); });
-    }
-    function cloneMajor(axis, label, key, summary){
-      return Object.assign({}, axis || {}, {
-        name: label,
-        title: label,
-        axis: label,
-        key: key,
-        score: Number(axis && axis.score) || 0,
-        summary: (axis && (axis.summary || axis.reason)) || summary,
-        reason: (axis && (axis.summary || axis.reason)) || summary
-      });
-    }
-    function majorAxes(){
-      if(Array.isArray(validation.majorAxisCheck) && validation.majorAxisCheck.length) return validation.majorAxisCheck;
-      var axes = Array.isArray(validation.axes) ? validation.axes : [];
-      if(validation.character === 'silent'){
-        return [
-          cloneMajor(findAxis(axes, /poison|毒/), '毒軸', 'poison', '毒付与・毒加速・耐久がどれくらいつながっているかを確認します。'),
-          cloneMajor(findAxis(axes, /shiv|ナイフ/), 'ナイフ軸', 'shiv', 'ナイフ生成・手数・火力変換がどれくらいつながっているかを確認します。'),
-          cloneMajor(findAxis(axes, /discard|slide|スライ/), 'スライ軸', 'スライ', 'スライ起動札・コンボ札・循環がどれくらいつながっているかを確認します。')
-        ];
-      }
-      if(validation.character === 'ironclad'){
-        return [
-          cloneMajor(findAxis(axes, /strength|筋力|筋肉/), '筋肉軸', 'strength', '筋肉供給と火力変換がどれくらいつながっているかを確認します。'),
-          cloneMajor(findAxis(axes, /exhaust|廃棄/), '廃棄軸', '廃棄', '廃棄手段と廃棄で得をするカードがどれくらいつながっているかを確認します。'),
-          cloneMajor(findAxis(axes, /block|defense|防御|ブロック/), '防御軸', 'block', '防御量・ブロック変換・長期戦性能がどれくらいつながっているかを確認します。'),
-          cloneMajor(findAxis(axes, /vulnerable|弱体|威圧|無慈悲/), '弱体軸', 'vulnerable', '威圧を中心に、弱体を防御・安定・突破力へ変換できているかを確認します。')
-        ];
-      }
-      return [];
-    }
-    function renderAxisCard(axis){
-      const st = stateForAxis(axis);
-      const axisProfile = typeof axisProfileByName === 'function' ? axisProfileByName(axis) : null;
-      const needs = (axisProfile && axisProfile.tags && axisProfile.tags.length ? axisProfile.tags : (axis.needs && axis.needs.length ? axis.needs : ['大きな不足なし'])).slice(0,3);
-      return `
-        <div class="winAxisCard ${st.cls}">
-          <div class="winAxisHead">
-            <div class="winAxisName">${escText(axis.name || '未判定')}</div>
-            <div class="winAxisStatus ${st.cls}">${escText(st.label || '未成立')}</div>
-          </div>
-          <div class="winAxisSummary">${escText(safeAxisSummary(axis, validation))}</div>
-          <div class="winAxisTags">${needs.map(function(n,i){ return '<span class="winAxisTag ' + (i===0 && axis.needs && axis.needs.length ? 'priority' : '') + '">' + escText(n) + '</span>'; }).join('')}</div>
-        </div>
-      `;
-    }
-    function validWinAxis(axis){
-      if(!axis || axis._fallback) return false;
-      var name = axisText(axis);
-      if(!name || /未判定|未成立|まだ何者でもない|石に変える準備|静かな循環|崩れない壁|不完全燃焼|噛み合い不足/.test(name)) return false;
-      return (Number(axis.score) || 0) >= 35;
-    }
-
-    const winSource = Array.isArray(validation.winConditionAxes) && validation.winConditionAxes.length ? validation.winConditionAxes : (Array.isArray(validation.axes) ? validation.axes.filter(validWinAxis) : []);
-    const rows = (winSource.length ? winSource : [{name:'主軸未確定', key:'unfixed', score:0, _fallback:true, summary:'成立している主軸はまだ見えていません。大軸チェックで伸びている方向を確認してください。', needs:['接続不足','主軸未確定']}]).map(renderAxisCard).join('');
-    const majorRows = majorAxes().map(renderAxisCard).join('');
-
-    const support = typeof renderSupportBars === 'function'
-      ? renderSupportBars(validation.supportMetrics || [])
-      : '';
-
-    return `
-      <div class="winStructurePanel">
-        <div class="winStructureTitle">勝ち筋分類</div>
-        <div class="winStructureLead">${escText(validation.conclusion || '勝ち筋と補助性能を確認します。')}</div>
-
-        <div class="winSection">
-          <div class="winSectionHead">
-            <div class="winSectionTitle">勝ち筋</div>
-            <div class="winSectionHint">実際に勝ち筋として成立している軸</div>
-          </div>
-          <div class="winAxisGrid">${rows}</div>
-        </div>
-
-        ${majorRows ? `<div class="winSection">
-          <div class="winSectionHead">
-            <div class="winSectionTitle">大軸チェック</div>
-            <div class="winSectionHint">未成立を含む主要軸の成立度</div>
-          </div>
-          <div class="winAxisGrid">${majorRows}</div>
-        </div>` : ''}
-
-        <div class="winSection">
-          <div class="winSectionHead">
-            <div class="winSectionTitle">補助性能</div>
-            <div class="winSectionHint">勝ち筋を支える能力</div>
-          </div>
-          <div class="supportList">${support}</div>
-        </div>
-
-        <div class="winStructureNote">勝ち筋分類は成立している軸だけを表示し、大軸チェックでは未成立を含む主要軸を確認します。</div>
-      </div>
-    `;
-  }
-
-  function renderWinSupportCardFromAnalysis(a){
-    if(!a && typeof analyzeDeck === 'function') a = analyzeDeck(deck);
-    if(!a) return '';
-    const reasons = a.winCondition && a.winCondition.reasons ? a.winCondition.reasons.join('。') + '。' : '';
-    const isRegentEconomy = !!(a.characterWinValidation && a.characterWinValidation.character === 'regent' && a.characterWinValidation.regentEconomy);
-    const valueText = isRegentEconomy ? 'メイン経済・経済停滞' : (a.winCondition?.name || '未判定');
-    const leadText = isRegentEconomy ? 'リージェントは「何を作り、何に変え、どこで止まるか」でデッキ状態を確認します。' : (a.characterWinValidation ? '勝ち筋と補助性能を分けて整理します。' : escText(reasons));
-    return `
-      <div class="advancedInsightCard winConditionFullCard" data-win-support-connected="true" data-deck-size="${Number(a.deckSize || 0)}">
-        <div class="advancedInsightTitle">勝ち筋分類</div>
-        <div class="advancedInsightValue">${escText(valueText)}</div>
-        <div class="advancedInsightText">${leadText}</div>
-        ${a.characterWinValidation ? '' : (typeof renderSilentAxisDetails === 'function' ? renderSilentAxisDetails(a.winCondition) : '')}
-        ${renderConnectedWinValidation(a.characterWinValidation)}
-        ${typeof renderSilentFlowAnalysis === 'function' ? renderSilentFlowAnalysis(a.silentFlow) : ''}
-      </div>
-    `;
-  }
-
-  function connectWinSupportDisplay(a){
-    const root = document.getElementById('advancedInsights');
-    if(!root || typeof analyzeDeck !== 'function') return;
-    const fresh = a || analyzeDeck(deck);
-
-    root.querySelectorAll('.winConditionFullCard').forEach(function(el){ el.remove(); });
-    root.insertAdjacentHTML('beforeend', renderWinSupportCardFromAnalysis(fresh));
-  }
-
-  const originalRenderAdvancedInsights = window.renderAdvancedInsights;
-  if(typeof originalRenderAdvancedInsights === 'function'){
-    window.renderAdvancedInsights = function(a){
-      originalRenderAdvancedInsights.call(this, a);
-      connectWinSupportDisplay(a);
-    };
-  }
-
-  const originalRenderAnalysis = window.renderAnalysis;
-  if(typeof originalRenderAnalysis === 'function'){
-    window.renderAnalysis = function(){
-      originalRenderAnalysis.apply(this, arguments);
-      connectWinSupportDisplay();
-    };
-  }
-
-  const originalRenderAll = window.renderAll;
-  if(typeof originalRenderAll === 'function'){
-    window.renderAll = function(){
-      originalRenderAll.apply(this, arguments);
-      connectWinSupportDisplay();
-    };
-  }
-
-  function bindDeckMutation(name){
-    const original = window[name];
-    if(typeof original !== 'function') return;
-    window[name] = function(){
-      const result = original.apply(this, arguments);
-      setTimeout(function(){ connectWinSupportDisplay(); }, 0);
-      return result;
-    };
-  }
-
-  ['addCard','removeCard','resetStarterDeck','loadDeckCode','loadDeckCodeFromDiagnosis','importDeckFile','setHero','resetDeck'].forEach(bindDeckMutation);
-
-  document.addEventListener('DOMContentLoaded', function(){
-    setTimeout(function(){
-      try{
-        connectWinSupportDisplay();
-      }catch(e){}
-    }, 0);
-  });
-
-  setTimeout(function(){
-    try{ connectWinSupportDisplay(); }catch(e){}
-  }, 80);
-})();
 
 
-// Silent Phase1 cards
-const SILENT_PHASE1_CARDS = [
-  {id:"silent_strike",name:"Strike",hero:"silent",type:"Attack",rarity:"Starter",cost:1,tags:["フロントロード","回転","スケーリング"]},
-  {id:"silent_defend",name:"Defend",hero:"silent",type:"Skill",rarity:"Starter",cost:1,tags:["防御"]},
-  {id:"neutralize",name:"Neutralize",hero:"silent",type:"Attack",rarity:"Starter",cost:0,tags:["フロントロード"]},
-  {id:"survivor",name:"Survivor",hero:"silent",type:"Skill",rarity:"Starter",cost:1,tags:["防御","スライ","回転","スライ起動札","圧縮"]},
+<!-- removed obsolete win-support-display-connection-fix-v4 render path; it rendered win axes without 現状コメント and wrapped renderAnalysis/renderAdvancedInsights. -->
 
-  {id:"deadly_poison",name:"Deadly Poison",hero:"silent",type:"Skill",rarity:"Common",cost:1,tags:["毒","スケーリング","毒起動札"]},
-  {id:"bane",name:"Bane",hero:"silent",type:"Attack",rarity:"Common",cost:1,tags:["毒","フロントロード","毒起動札","毒コンボ札","コンボ依存","浮き札危険"]},
-  {id:"poisoned_stab",name:"Poisoned Stab",hero:"silent",type:"Attack",rarity:"Common",cost:1,tags:["毒","フロントロード","毒起動札"]},
-  {id:"dagger_throw",name:"Dagger Throw",hero:"silent",type:"Attack",rarity:"Common",cost:1,tags:["スライ","ドロー","フロントロード","回転","スライ起動札","圧縮"]},
-  {id:"acrobatics",name:"Acrobatics",hero:"silent",type:"Skill",rarity:"Common",cost:1,tags:["ドロー","スライ","回転","スライ起動札","圧縮"]},
-  {id:"backflip",name:"Backflip",hero:"silent",type:"Skill",rarity:"Common",cost:1,tags:["ドロー","防御","回転"]},
-  {id:"cloak_and_dagger",name:"Cloak and Dagger",hero:"silent",type:"Skill",rarity:"Common",cost:1,tags:["ナイフ","防御","ナイフ起動札"]},
-  {id:"blade_dance",name:"Blade Dance",hero:"silent",type:"Skill",rarity:"Common",cost:1,tags:["ナイフ","フロントロード","ナイフ起動札"]},
-  {id:"slice",name:"Slice",hero:"silent",type:"Attack",rarity:"Common",cost:0,tags:["フロントロード"]},
-  {id:"all_out_attack",name:"All Out Attack",hero:"silent",type:"Attack",rarity:"Common",cost:1,tags:["AoE","フロントロード","スライ","回転","スライ起動札","圧縮"]},
-
-  {id:"noxious_fumes",name:"Noxious Fumes",hero:"silent",type:"Power",rarity:"Uncommon",cost:1,tags:["毒","スケーリング","毒起動札"]},
-  {id:"catalyst",name:"Catalyst",hero:"silent",type:"Skill",rarity:"Uncommon",cost:1,tags:["毒","フィニッシャー","毒起動札","毒コンボ札","コンボ依存","浮き札危険"]},
-  {id:"terror",name:"Terror",hero:"silent",type:"Skill",rarity:"Uncommon",cost:0,tags:["セットアップ","フロントロード"]},
-  {id:"calculated_gamble",name:"Calculated Gamble",hero:"silent",type:"Skill",rarity:"Uncommon",cost:0,tags:["ドロー","スライ","回転","スライ起動札","圧縮"]},
-  {id:"tactician",name:"Tactician",hero:"silent",type:"Skill",rarity:"Uncommon",cost:0,tags:["スライ","エナジー","回転","スライ起動札","スライコンボ札","コンボ依存","浮き札危険","圧縮"]},
-  {id:"reflex",name:"Reflex",hero:"silent",type:"Skill",rarity:"Uncommon",cost:0,tags:["スライ","ドロー","回転","スライ起動札","スライコンボ札","コンボ依存","浮き札危険","圧縮"]},
-  {id:"footwork",name:"Footwork",hero:"silent",type:"Power",rarity:"Uncommon",cost:1,tags:["防御","スケーリング"]},
-  {id:"after_image",name:"After Image",hero:"silent",type:"Power",rarity:"Rare",cost:1,tags:["防御","スケーリング"]},
-  {id:"wraith_form",name:"Wraith Form",hero:"silent",type:"Power",rarity:"Rare",cost:3,tags:["防御","セットアップ"]},
-  {id:"corpse_explosion",name:"Corpse Explosion",hero:"silent",type:"Skill",rarity:"Rare",cost:2,tags:["毒","AoE","フィニッシャー","毒起動札","毒コンボ札","コンボ依存","浮き札危険"]},
-  {id:"bullet_time",name:"Bullet Time",hero:"silent",type:"Skill",rarity:"Rare",cost:3,tags:["エナジー","セットアップ"]},
-  {id:"die_die_die",name:"Die Die Die",hero:"silent",type:"Attack",rarity:"Rare",cost:1,tags:["AoE","フロントロード","フィニッシャー"]},
-];
-
-</script>
 
 
 
@@ -20533,13 +20452,15 @@ const SILENT_PHASE1_CARDS = [
   function axisDescriptionForCard(axis, validation){
     var axisName = axisRawName(axis);
     var key = axisKeyText(axis);
+    var hay = axisName + ' ' + key;
+    if(validation && validation.character === 'silent'){
+      if(/poison|毒/.test(hay)) return '毒付与・毒加速・耐久をつなげ、長期戦で削り切る軸です。';
+      if(/shiv|ナイフ/.test(hay)) return 'ナイフ生成・手数・火力変換をつなげ、短期火力やバーストへ伸ばす軸です。';
+      if(/discard|slide|スライ/.test(hay)) return 'スライ起動札・コンボ札・循環をつなげ、手札交換や到達力で勝つ軸です。';
+      if(/防御継続|防御|ブロック|sustain|defense|block/.test(hay)) return 'フットワーク・ブラー・足払い・金切り声・残像などで、被弾を抑えながら勝ち筋を支える補助軸です。';
+    }
     var profile = typeof axisProfileByName === 'function' ? axisProfileByName(axis) : null;
     if(profile && profile.description) return displayValue(profile.description, 'この軸の役割を確認します。');
-    if(validation && validation.character === 'silent'){
-      if(/poison|毒/.test(axisName + ' ' + key)) return '毒付与・毒加速・耐久をつなげ、長期戦で削り切る軸です。';
-      if(/shiv|ナイフ/.test(axisName + ' ' + key)) return 'ナイフ生成・手数・火力変換をつなげ、短期火力やバーストへ伸ばす軸です。';
-      if(/discard|slide|スライ/.test(axisName + ' ' + key)) return 'スライ起動札・コンボ札・循環をつなげ、手札交換や到達力で勝つ軸です。';
-    }
     if(/strength|筋力|筋肉/.test(axisName + ' ' + key)) return '筋力供給を多段攻撃や決定打へつなげ、火力を大きく伸ばす軸です。';
     if(/exhaust|廃棄/.test(axisName + ' ' + key)) return '廃棄で不要札を処理し、堕落・無痛・鬼火などの接続で循環や防御へ変換する軸です。';
     if(/block|defense|防御|ブロック/.test(axisName + ' ' + key)) return 'ブロック維持や高防御札を使い、継戦能力や火力変換で勝つ軸です。';
@@ -20554,28 +20475,34 @@ const SILENT_PHASE1_CARDS = [
     var axisProfile = typeof axisProfileByName === 'function' ? axisProfileByName(axis) : null;
     return (axisProfile && axisProfile.tags && axisProfile.tags.length ? axisProfile.tags : (Array.isArray(axis && axis.needs) && axis.needs.length ? axis.needs : ['大きな不足なし'])).slice(0,3);
   }
+  function cleanAxisCurrentCommentText(value){
+    return escDisplay(value, '確認中です。').replace(/^現状[：:]\s*/, '').trim();
+  }
   function axisCurrentCommentForCard(axis, validation, st, needs){
     var axisName = axisRawName(axis);
-    if(axis && axis._fallback) return '現状：成立している勝ち筋はまだ見えていません。大軸チェックで形成中の方向を確認し、まず軸札と支え札を増やしてください。';
+    if(axis && axis._fallback) return '成立している勝ち筋はまだ見えていません。大軸チェックで形成中の方向を確認し、まず軸札と支え札を増やしてください。';
     var score = axisScoreForDisplay(axis, validation);
+    var description = axisDescriptionForCard(axis, validation);
     var summary = axisSummaryForCard(axis, validation);
+    if(summary && description && String(summary).trim() === String(description).trim()) summary = '';
     var firstNeed = (needs || []).find(function(x){ return x && !/大きな不足なし/.test(String(x)); }) || '';
     var needText = firstNeed ? ' 次に' + firstNeed + 'を補うと成立しやすくなります。' : '';
     if(score >= 65){
-      return '現状：' + axisName + 'は成立しています。' + (summary ? ' ' + summary : '') + (firstNeed ? ' ただし' + firstNeed + 'が薄い場合は注意です。' : '');
+      return axisName + 'は成立しています。' + (summary ? ' ' + summary : '') + (firstNeed ? ' ただし' + firstNeed + 'が薄い場合は注意です。' : '');
     }
     if(score >= 35){
-      return '現状：' + axisName + 'の部品はありますが、まだ接続が不足しており形成中です。' + (summary ? ' ' + summary : '') + needText;
+      return axisName + 'のパーツはありますが、まだ接続が不足しており形成中です。' + (summary ? ' ' + summary : '') + needText;
     }
-    return '現状：関連カードや接続先が少なく、' + axisName + 'としては未成立です。' + (firstNeed ? ' まず' + firstNeed + 'を補ってください。' : ' まず軸札・変換先・防御の接続を増やしてください。');
+    return '関連カードや接続先が少なく、' + axisName + 'としては未成立です。' + (firstNeed ? ' まず' + firstNeed + 'を補ってください。' : ' まず軸札・変換先・防御の接続を増やしてください。');
   }
   function renderAxisCheckCard(axis, validation){
     var st = axisState(axis, validation);
     var axisName = axisRawName(axis);
     var description = axisDescriptionForCard(axis, validation);
     var needs = axisNeedsForCard(axis);
-    var currentComment = axisCurrentCommentForCard(axis, validation, st, needs);
-    return '<div class="winAxisCard ' + st.cls + '"><div class="winAxisHead"><div class="winAxisName">' + escDisplay(axisName, '未判定') + '</div><div class="winAxisStatus ' + st.cls + '">' + escDisplay(st.label, '未成立') + '</div></div><div class="winAxisDescription"><b>軸説明：</b>' + escDisplay(description, '確認中です。') + '</div><div class="winAxisCurrent"><b>現状コメント：</b>' + escDisplay(currentComment, '確認中です。') + '</div><div class="winAxisTags">' + needs.map(function(n,i){ return '<span class="winAxisTag ' + (i===0 && axis && axis.needs && axis.needs.length ? 'priority' : '') + '">' + escDisplay(n, 'なし') + '</span>'; }).join('') + '</div></div>';
+    var currentComment = cleanAxisCurrentCommentText(axisCurrentCommentForCard(axis, validation, st, needs));
+    var tagHtml = needs.map(function(n,i){ return '<span class="winAxisTag ' + (i===0 && axis && axis.needs && axis.needs.length ? 'priority' : '') + '">' + escDisplay(n, 'なし') + '</span>'; }).join('');
+    return '<div class="winAxisCard ' + st.cls + '"><div class="winAxisHead"><div class="winAxisTitleLine"><div class="winAxisName">' + escDisplay(axisName, '未判定') + '</div><div class="winAxisTags winAxisTagsInline">' + tagHtml + '</div></div><div class="winAxisStatus ' + st.cls + '">' + escDisplay(st.label, '未成立') + '</div></div><div class="winAxisDescription"><b>軸説明：</b>' + escDisplay(description, '確認中です。') + '</div><div class="winAxisCurrent">' + escDisplay(currentComment, '確認中です。') + '</div></div>';
   }
   function sameAxisKind(a,b){
     var t = axisRawName(a) + ' ' + axisKeyText(a);
@@ -20657,7 +20584,7 @@ const SILENT_PHASE1_CARDS = [
     const root = document.getElementById('advancedInsights');
     if(!root || typeof analyzeDeck !== 'function') return;
     const fresh = a || analyzeDeck(deck);
-    root.querySelectorAll('.winConditionFullCard').forEach(function(el){ el.remove(); });
+    root.querySelectorAll('.winConditionFullCard:not(.floatingDetailPanel)').forEach(function(el){ el.remove(); });
     root.insertAdjacentHTML('beforeend', renderSafeWinSupportCard(fresh));
   }
   function updateHeroWin(a){
@@ -20913,15 +20840,29 @@ const SILENT_PHASE1_CARDS = [
       return Object.assign({}, validation, {axes, winConditionAxes:winAxes, majorAxisCheck:axes.slice(), mainAxis:top || validation.mainAxis, supportAxes:supports, conclusion});
     };
   }
+  function impl164AfterImageSupported(cards, metrics){
+    cards = (cards || []).filter(Boolean);
+    var count = function(pred){ return cards.filter(pred).length; };
+    var zeroCostGeneration = count(function(c){
+      return isSilent(c) && (Number(c.cost) === 0 || tag(c,'ナイフ生成') || tag(c,'0コスト') || calc(c,'addshivs') || calc(c,'shiv') || calc(c,'sly') || cardName(c).indexOf('剣の舞') >= 0 || cardName(c).indexOf('外套と短剣') >= 0 || cardName(c).indexOf('準備') >= 0);
+    });
+    var slideCore = count(function(c){ return isSilent(c) && (tag(c,'スライ') || tag(c,'スライ起動札') || tag(c,'スライコンボ札') || calc(c,'sly') || cardName(c).indexOf('アクロバット') >= 0 || cardName(c).indexOf('ダガースロー') >= 0 || cardName(c).indexOf('計算された賭け') >= 0); });
+    var drawAction = count(function(c){ return isSilent(c) && (c.draw || c.drawNext || tag(c,'ドロー') || tag(c,'回転') || cardName(c).indexOf('アドレナリン') >= 0 || cardName(c).indexOf('バックフリップ') >= 0); });
+    var rotation = Number(metrics && metrics.deckRotationScore) || 0;
+    var slideBOrBetter = slideCore >= 3 || (slideCore >= 2 && (drawAction >= 2 || rotation >= 45));
+    return zeroCostGeneration >= 1 || slideBOrBetter;
+  }
   const originalDetectFloatingCards = window.detectFloatingCards;
   if(typeof originalDetectFloatingCards === 'function'){
     window.detectFloatingCards = detectFloatingCards = function(cards, s){
       const result = originalDetectFloatingCards(cards, s) || [];
       const silentNonStrengthNames = new Set((cards || []).filter(isSilentNonStrengthMulti).map(cardName));
       const p = poisonInfo(cards, s || {});
+      const afterImageSupported = impl164AfterImageSupported(cards || [], s || {});
       return result.filter(issue=>{
         const reason = String(issue && issue.reason || '');
         const category = String(issue && issue.category || '');
+        if(afterImageSupported && /残像|After Image/i.test(String(issue && issue.name || ''))) return false;
         if(silentNonStrengthNames.has(issue && issue.name) && /筋力|多段攻撃/.test(reason + category)) return false;
         return true;
       }).map(issue=>{
@@ -21184,7 +21125,8 @@ const SILENT_PHASE1_CARDS = [
       var knifeReady = stats.shivGen >= 2 && stats.shivPayoff >= 1 && (stats.action >= 2 || stats.draw >= 2 || stats.energy >= 1);
       var knifeComplete = knifeReady && stats.shivPayoff >= 2 && (stats.shivFinish >= 1 || stats.draw >= 3) && stats.action >= 3;
       if(knifeComplete){
-        score = cap(score, 84);
+        score = Math.max(score, 78);
+        out.summary = addSummary(out, 'ナイフ生成・強化・手数がつながっており、ナイフ軸は成立しています。');
       }else if(knifeReady){
         score = cap(score, 64);
         out.summary = addSummary(out, 'ナイフ方向は見えていますが、手数・ドロー・決定力の接続がまだ形成中です。');
@@ -21420,6 +21362,8 @@ const SILENT_PHASE1_CARDS = [
     var poisonAccel = count(cards, function(c){ return c.catalystMultiplier || has(c,'毒コンボ札') || calc(c,'multiplypoison') || String(c.nameJa||'').includes('触媒'); });
     var shivGen = count(cards, function(c){ return c.shiv || has(c,'ナイフ生成') || has(c,'ナイフ起動札'); });
     var shivPayoff = count(cards, function(c){ return c.shivDamageBonus || has(c,'ナイフコンボ札') || (has(c,'ナイフ') && (has(c,'スケーリング') || has(c,'フィニッシャー'))); });
+    var completedIronPackage = iron && count(cards,function(c){ return ['堕落','無痛','鬼火','セカンドウィンド','バリケード','ボディスラム','不動','武装解除','受け流し','ジャガーノート'].indexOf(String(c && (c.nameJa || c.id)))>=0 || ['corruption','feel_no_pain','fiend_fire','second_wind','barricade','body_slam','impervious','disarm','shrug_it_off','juggernaut'].indexOf(String(c && c.id))>=0; }) >= 6;
+    var completedSilentKnifePackage = silent && shivGen >= 2 && shivPayoff >= 2 && count(cards,function(c){ return ['アドレナリン','アクロバット','バックフリップ','フットワーク','ブラー','足払い','金切り声','残像'].indexOf(String(c && c.nameJa))>=0 || ['silent_adrenaline','silent_acrobatics','silent_backflip','silent_footwork','silent_blur','silent_leg_sweep','silent_piercing_wail','silent_after_image'].indexOf(String(c && c.id))>=0; }) >= 4;
     var avgDamage = n(result && result.avgDamage);
     var oneTurn = n(result && result.oneTurnMaxDamage);
     var avgBlock = n(result && result.avgBlock);
@@ -21434,7 +21378,7 @@ const SILENT_PHASE1_CARDS = [
     var sustain = clamp(avgBlock*2.3 + defense*4 + blockScale*12 + hpSustain*8 + Math.min(24, rotation*3) + Math.min(12, energy*5) + Math.min(16, longDamage*3) - (longDamage === 0 ? 10 : 0) - Math.max(0, energyLoad-65)*0.35 - baneCount*5 + Math.min(5, baneHandling*0.8));
     var setupArrival = clamp(setup*13 + setupPayoff*12 + (setupDefense ? 18 : 0) + (setupEnergy ? 14 : 0) + (setupAccess ? 18 : 0) + Math.min(16, pureDraw*3 + rotation*2) - (setup > 0 && setupPayoff === 0 ? 18 : 0) - (setup > 0 && !setupDefense ? 12 : 0) - baneCount*(setup > 0 ? 9 : 4) - Math.max(0, noiseCount-1)*5 + Math.min(6, baneHandling*0.9));
     var rotationQuality = clamp(pureDraw*8 + discard*5 + discardPayoff*7 + rotation*5 + access*8 + lowCost*1.5 + zero*1.5 + energy*4 - Math.max(0, energyLoad-60)*0.45 - actionShort*20 - baneCount*6 - Math.max(0, noiseCount-1)*4 + Math.min(10, baneHandling*1.3 + (silent ? discard*0.8 : 0) + discardPayoff*0.8));
-    return {silent, iron, deckSize, baneCount, noiseCount, baneHandling, starter, attacks, powers, front, burstCards, immediateAoe, lowAoe, poisonAoe, conditionalAoe, sustainedAoe, defense, blockScale, hpSustain, longDamage, pureDraw, discard, discardPayoff, rotation, access, energy, lowCost, zero, setup, setupPayoff, setupDefense, setupEnergy, setupAccess, poisonApply, poisonAccel, shivGen, shivPayoff, avgDamage, oneTurn, avgBlock, energyLoad, brick, actionShort, elite, aoeQuality, sustain, setupArrival, rotationQuality};
+    return {silent, iron, deckSize, baneCount, noiseCount, baneHandling, starter, attacks, powers, front, burstCards, immediateAoe, lowAoe, poisonAoe, conditionalAoe, sustainedAoe, defense, blockScale, hpSustain, longDamage, pureDraw, discard, discardPayoff, rotation, access, energy, lowCost, zero, setup, setupPayoff, setupDefense, setupEnergy, setupAccess, poisonApply, poisonAccel, shivGen, shivPayoff, completedIronPackage, completedSilentKnifePackage, avgDamage, oneTurn, avgBlock, energyLoad, brick, actionShort, elite, aoeQuality, sustain, setupArrival, rotationQuality};
   }
 
   function pushUnique(target, values){
@@ -21445,12 +21389,13 @@ const SILENT_PHASE1_CARDS = [
 
   function practicalMissingAndWarnings(stats){
     var missing = [], warnings = [];
-    if(stats.elite < 42){ missing.push('エリート突破力'); warnings.push('エリート戦の短期火力・防御接続が不足気味'); }
-    if(stats.aoeQuality < 35){ missing.push('全体攻撃性能'); warnings.push('全体攻撃性能は枚数または即効性が不足しています'); }
-    else if(stats.poisonAoe > 0 && stats.immediateAoe === 0){ warnings.push('毒の全体攻撃性能はありますが、即効性のある全体攻撃性能とは別に見ます'); }
-    if(stats.sustain < 42){ missing.push('継戦能力の実戦値'); warnings.push('長期戦で防御・火力・回転が途切れやすい'); }
-    if(stats.setup > 0 && stats.setupArrival < 45){ missing.push('セットアップ到達率'); warnings.push('セットアップ札はありますが、対象・防御・アクセスが不足気味'); }
-    if(stats.rotationQuality < 42){ missing.push('回転の質'); warnings.push('必要札アクセスや不要札処理がまだ弱い'); }
+    var completedPackage = stats.completedIronPackage || stats.completedSilentKnifePackage;
+    if(!completedPackage && stats.elite < 42){ missing.push('エリート突破力'); warnings.push('エリート戦の短期火力・防御接続が不足気味'); }
+    if(!completedPackage && stats.aoeQuality < 35){ missing.push('全体攻撃性能'); warnings.push('全体攻撃性能は枚数または即効性が不足しています'); }
+    else if(!completedPackage && stats.poisonAoe > 0 && stats.immediateAoe === 0){ warnings.push('毒の全体攻撃性能はありますが、即効性のある全体攻撃性能とは別に見ます'); }
+    if(!completedPackage && stats.sustain < 42){ missing.push('継戦能力の実戦値'); warnings.push('長期戦で防御・火力・回転が途切れやすい'); }
+    if(!completedPackage && stats.setup > 0 && stats.setupArrival < 45){ missing.push('セットアップ到達率'); warnings.push('セットアップ札はありますが、対象・防御・アクセスが不足気味'); }
+    if(!completedPackage && stats.rotationQuality < 42){ missing.push('回転の質'); warnings.push('必要札アクセスや不要札処理がまだ弱い'); }
     if(stats.baneCount > 0 && stats.baneHandling <= 1) warnings.push('アセンダーの災い込みでは、初動・セットアップ・回転がやや遅れます');
     if(stats.silent && stats.pureDraw >= 2 && stats.energyLoad >= 65) warnings.push('ドローはありますが、エナジー不足で行動に変換しにくい');
     if(stats.silent && stats.discard > 0 && stats.discardPayoff === 0) warnings.push('スライはありますが、スライで得をするカードが不足しています');
@@ -21507,7 +21452,8 @@ const SILENT_PHASE1_CARDS = [
     }
     if(/ナイフ|shiv/.test(key)){
       var knifeReady = stats.shivGen >= 2 && stats.shivPayoff >= 1 && stats.rotationQuality >= 45 && (stats.elite >= 45 || stats.energy >= 1);
-      if(!knifeReady && (stats.shivGen > 0 || stats.shivPayoff > 0)) score = cap(score, 54);
+      if(stats.completedSilentKnifePackage) score = Math.max(score, 82);
+      else if(!knifeReady && (stats.shivGen > 0 || stats.shivPayoff > 0)) score = cap(score, 54);
     }
     var accessReady = stats.rotationQuality >= 55 || stats.pureDraw >= 2 || stats.access >= 1;
     var defenseReady = stats.sustain >= 50 || stats.avgBlock >= 12 || stats.defense >= 4;
@@ -21532,7 +21478,15 @@ const SILENT_PHASE1_CARDS = [
     }else if(/筋力|strength|廃棄|exhaust|ramp|エナジー/.test(key)){
       sReady = accessReady && energyReady && defenseReady && stats.longDamage >= 2 && stats.elite >= 55;
     }
-    if(!accessReady || !energyReady || !defenseReady || !lowBrick) score = cap(score, 84);
+    if(stats.completedIronPackage && /防御|block|sustain|長期|スケール|廃棄|exhaust|ramp|エナジー|筋力|strength/.test(key)){
+      sReady = true;
+      score = Math.max(score, 82);
+    }
+    if(stats.completedSilentKnifePackage && /ナイフ|shiv/.test(key)){
+      sReady = true;
+      score = Math.max(score, 82);
+    }
+    if(!accessReady || !energyReady || !defenseReady || !lowBrick) score = cap(score, (stats.completedIronPackage || stats.completedSilentKnifePackage) ? 88 : 84);
     if(!sReady) score = cap(score, 84);
     if(score >= 90 && !sReady) score = 84;
     out.score = clamp(score);
@@ -21606,6 +21560,12 @@ const SILENT_PHASE1_CARDS = [
       if(currentAct === 'act1' && stats.elite < 42) result.actEvaluation.score = clamp(Math.min(n(result.actEvaluation.score), 60));
       if(currentAct === 'act2' && stats.aoeQuality < 42) result.actEvaluation.score = clamp(Math.min(n(result.actEvaluation.score), 56));
       if(currentAct === 'act3' && (stats.sustain < 45 || stats.longDamage < 2)) result.actEvaluation.score = clamp(Math.min(n(result.actEvaluation.score), 58));
+      if(typeof rankFromScore === 'function'){
+        var _rankAfterPractical = rankFromScore(Number(result.actEvaluation.score) || 0);
+        result.actEvaluation.rank = _rankAfterPractical.rank;
+        result.actEvaluation.rankText = _rankAfterPractical.text;
+        result.actEvaluation.rankClass = _rankAfterPractical.className;
+      }
     }
     if(result.characterWinValidation) result.characterWinValidation = rebuildValidation(result.characterWinValidation, stats);
     if(result.silentWinValidation) result.silentWinValidation = rebuildValidation(result.silentWinValidation, stats);
@@ -23360,55 +23320,152 @@ const SILENT_PHASE1_CARDS = [
   function hasCalc(c,s){ return arr(c && c.specialCalc).map(String).some(x=>x.toLowerCase().includes(String(s).toLowerCase())); }
   function esc(s){ return String(s ?? '').replace(/[&<>"]/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]; }); }
 
-  function floatingSeverityClass(x){
-    var cls = String((x && x.severityClass) || '').trim();
-    if(cls) return cls;
-    var score = n(x && x.score);
-    if(score >= 70) return 'high';
-    if(score >= 45) return 'mid';
-    return 'low';
+  // impl156: Act評価をAct別危険分析へ統合。新規wrapperは追加せず、既存の最終advanced render cleanup経路で更新する。
+  function act156Score(a, key){
+    var ms = (a && a.mainScores) || {};
+    return Number(ms[key]) || 0;
   }
-  function floatingSeverityLabel(x){
-    if(x && x.severity) return String(x.severity);
-    var cls = floatingSeverityClass(x);
-    if(cls === 'high') return '要対応';
-    if(cls === 'mid') return '支援不足';
-    return '軽度';
-  }
-  function renderFloatingPriorityPanelImpl35(a){
-    var items = arr(a && a.floatingCards).slice(0,8);
-    if(!items.length){
-      return '<div class="advancedInsightCard winConditionFullCard floatingDetailPanel good implementation35FloatingPriority">'
-        + '<div class="advancedInsightTitle">浮いてるカード</div>'
-        + '<div class="floatingDetailLead">現在のデッキでは、勝ち筋から大きく外れているカードは少なめです。</div>'
-        + '</div>';
+  function act156Tags(a){
+    if(a && Array.isArray(a.deficiencyTags) && a.deficiencyTags.length) return a.deficiencyTags;
+    if(typeof window.buildDeficiencyTags === 'function'){
+      try{ return window.buildDeficiencyTags(a) || []; }catch(e){}
     }
-    return '<div class="advancedInsightCard winConditionFullCard floatingDetailPanel implementation35FloatingPriority">'
-      + '<div class="advancedInsightTitle">浮いてるカード</div>'
-      + '<div class="floatingDetailLead">実カードがある場合は、汎用メッセージよりカード名と理由を優先して表示します。</div>'
-      + '<div class="floatingDetailList">'
-      + items.map(function(x){
-          var cls = esc(floatingSeverityClass(x));
-          var support = arr(x && x.support).slice(0,5).map(function(s){ return '<span class="floatingSupportChip">'+esc(s)+'</span>'; }).join('');
-          var action = x && x.action ? '<div class="floatingActionText"><b>次の行動：</b>'+esc(x.action)+'</div>' : '';
-          return '<div class="floatingDetailCard '+cls+'">'
-            + '<div class="floatingDetailTop"><div class="floatingDetailName">'+esc(x && x.name || '不明カード')+'</div>'
-            + '<span class="floatingDetailSeverity '+cls+'">'+esc(floatingSeverityLabel(x))+'</span></div>'
-            + '<div class="floatingDetailText"><b>理由：</b>'+esc(x && x.reason || '現在の勝ち筋との接続が薄いです。')+'</div>'
-            + (support ? '<div class="floatingDetailSupport">'+support+'</div>' : '')
-            + action
-            + '</div>';
-        }).join('')
-      + '</div></div>';
+    return [];
+  }
+  function act156HasTag(tags, re){
+    return arr(tags).some(function(t){ return re.test(String((t && t.name) || t || '')); });
+  }
+  function act156PushUnique(list, value){
+    if(value && list.indexOf(value) < 0) list.push(value);
+  }
+  function act156DangerFromScore(score, causes){
+    var n = Number(score) || 0;
+    if(n >= 72 && (!causes || causes.length <= 1)) return {text:'低', cls:''};
+    if(n >= 60) return {text:'中', cls:'warn'};
+    if(n >= 45) return {text:'高', cls:'danger'};
+    return {text:'危険', cls:'danger'};
+  }
+  function act156CauseData(a){
+    var evalInfo = (a && a.actEvaluation) || {};
+    var rawAct = String(evalInfo.act || (typeof currentAct !== 'undefined' ? currentAct : 'act1') || 'act1').toLowerCase();
+    var act = /3/.test(rawAct) ? 'act3' : (/2/.test(rawAct) ? 'act2' : 'act1');
+    var tags = act156Tags(a);
+    var causes = [];
+    var needs = [];
+    var fire = act156Score(a,'火力');
+    var defense = act156Score(a,'防御');
+    var draw = act156Score(a,'ドロー');
+    var energy = act156Score(a,'エナジー');
+    var accident = act156Score(a,'事故率');
+    var compression = act156Score(a,'圧縮率');
+    var scale = act156Score(a,'スケール');
+    var action = act156Score(a,'行動数');
+    var hasAoeBad = act156HasTag(tags, /AoE|全体|複数|横並び/);
+    var clearState = (typeof window.clearCapableStateImpl159 === 'function') ? window.clearCapableStateImpl159(a, tags) : {clear:false};
+    var act156ClearCapable = !!(clearState && clearState.clear);
+    // impl165: クリア圏内でもAct別の注意点は残す。
+    // ここで原因タグを「クリア圏内」だけに置き換えず、下のAct別原因生成を通す。
+    if(act === 'act1'){
+      if(fire < 55 || act156HasTag(tags, /初動|フロントロード|火力|打点|エリート/)){ act156PushUnique(causes,'初動火力'); act156PushUnique(needs,'軽量火力'); }
+      if(defense < 45 || act156HasTag(tags, /防御|ブロック|軽量防御/)){ act156PushUnique(causes,'初動防御'); act156PushUnique(needs,'初動防御'); }
+      if(draw < 45 || action < 45 || act156HasTag(tags, /ドロー|回転|循環/)){ act156PushUnique(causes,'手札到達'); act156PushUnique(needs,'軽量ドロー'); }
+      if(accident >= 28 || act156HasTag(tags, /事故|重量|エナジー/)){ act156PushUnique(causes,'手札事故'); act156PushUnique(needs,'軽いカード'); }
+      if(!causes.length){ act156PushUnique(causes,'序盤安定'); act156PushUnique(needs,'勝ち筋接続'); }
+    }else if(act === 'act2'){
+      if(hasAoeBad){ act156PushUnique(causes,'AoE不足'); act156PushUnique(needs,'AoE'); }
+      if(defense < 58 || act156HasTag(tags, /防御|ブロック|継続防御/)){ act156PushUnique(causes,'防御継続'); act156PushUnique(needs,'継続防御'); }
+      if(accident >= 26 || act156HasTag(tags, /状態異常|事故|回転|ドロー/)){ act156PushUnique(causes,'高圧ターン'); act156PushUnique(needs,'ドロー'); }
+      if(energy < 45 || act156HasTag(tags, /エナジー|重量|重い/)){ act156PushUnique(causes,'エナジー不足'); act156PushUnique(needs,'エナジー'); }
+      if(scale < 45){ act156PushUnique(causes,'継続火力'); act156PushUnique(needs,'スケール'); }
+      if(!causes.length){ act156PushUnique(causes,'Act2対応'); act156PushUnique(needs,'AoE'); act156PushUnique(needs,'継続防御'); }
+    }else{
+      if(scale < 60 || act156HasTag(tags, /スケール|長期|伸び/)){ act156PushUnique(causes,'スケール不足'); act156PushUnique(needs,'スケール'); }
+      if(draw < 55 || action < 50 || act156HasTag(tags, /ドロー|回転|循環/)){ act156PushUnique(causes,'回転不足'); act156PushUnique(needs,'ドロー'); }
+      if(compression < 50 || act156HasTag(tags, /圧縮|不要札|呪い/)){ act156PushUnique(causes,'圧縮不足'); act156PushUnique(needs,'圧縮'); }
+      if(fire < 58 || act156HasTag(tags, /決定力|ボス|火力|打点/)){ act156PushUnique(causes,'ボス火力'); act156PushUnique(needs,'決定力'); }
+      if(defense < 50){ act156PushUnique(causes,'長期防御'); act156PushUnique(needs,'継続防御'); }
+      if(!causes.length){ act156PushUnique(causes,'長期戦対応'); act156PushUnique(needs,'勝ち筋接続'); }
+    }
+    return {act:act, causes:causes.slice(0,4), needs:needs.slice(0,4), clearCapable:act156ClearCapable};
+  }
+  function act156Comment(data){
+    var causes = data.causes || [];
+    if(data && data.clearCapable){
+      if(data.act === 'act3') return 'Act3向けの長期戦要素は見えています。大きな補強よりも、ボス戦で再現できるかとプレイ判断のブレに注意したい状態です。';
+      if(data.act === 'act2') return 'Act2の横並び・高火力にはある程度対応できます。大きな補強よりも、AoEや継続防御を薄くしすぎないか確認したい状態です。';
+      return 'Act1の突破力はあります。大きな補強よりも、重いカードを増やしすぎて初動を崩さないか確認したい状態です。';
+    }
+    if(data.act === 'act1'){
+      if(causes.indexOf('初動火力') >= 0) return '初動火力が低いと、序盤雑魚やエリート戦で押し切れず被弾が増えやすいです。';
+      if(causes.indexOf('手札事故') >= 0) return '初手が偏ると攻撃か防御が途切れ、序盤からHPを削られやすいです。';
+      return 'Act1では、序盤雑魚とエリート前に必要な軽い火力・防御を確認します。';
+    }
+    if(data.act === 'act2'){
+      if(causes.indexOf('AoE不足') >= 0) return 'AoEや継続防御が薄いと、Act2の横並び戦や高火力連打でHPを削られやすいです。';
+      if(causes.indexOf('防御継続') >= 0) return 'Act2では連続被弾が重く、防御が途切れると一気にHPを失いやすいです。';
+      return 'Act2では、横並び・高火力連打・状態異常で崩れないかを確認します。';
+    }
+    if(causes.indexOf('スケール不足') >= 0) return 'スケールやデッキ回転が不足すると、長期戦で重要札に届かずボス戦で押し負けやすいです。';
+    if(causes.indexOf('回転不足') >= 0 || causes.indexOf('圧縮不足') >= 0) return '重要札への到達が遅いと、Act3の長期戦で勝ち筋を再現しにくくなります。';
+    return 'Act3では、ボス戦で勝ち筋を再現できるか、スケールと決定力を確認します。';
+  }
+  function act156EnemyNote(data){
+    if(data && data.clearCapable) return ['雑魚：安定','エリート：大きな危険は少ない','ボス：再現性と判断だけ確認'];
+    if(data.act === 'act1') return ['雑魚：初動火力不足に注意','エリート：防御と短期火力の両立が必要','ボス：スケール不足なら長期戦に注意'];
+    if(data.act === 'act2') return ['雑魚：横並び処理に注意','エリート：高火力連打に注意','ボス：継続防御と火力の伸びが必要'];
+    return ['雑魚：状態異常や高HP敵で回転低下に注意','エリート：決定力不足に注意','ボス：長期戦の再現性が重要'];
+  }
+  function act156RenderTag(name, cls){
+    return '<span class="actDangerMiniTag ' + esc(cls || '') + '">' + esc(name) + '</span>';
+  }
+  function act156RenderRow(title, tagsHtml, bodyHtml){
+    return '<div class="actDangerAnalysisRow"><div class="actDangerAnalysisHead"><div class="actDangerAnalysisAct">' + esc(title) + '</div><div class="actDangerMiniTags">' + (tagsHtml || '') + '</div></div><div class="actDangerAnalysisText">' + (bodyHtml || '') + '</div></div>';
+  }
+  function act156UpdatePanel(a){
+    var panel = document.getElementById('actDangerAnalysisPanel');
+    if(!panel || !a) return;
+    var e = a.actEvaluation || {};
+    var label = e.label || (typeof currentAct !== 'undefined' && currentAct === 'act3' ? 'Act3' : (typeof currentAct !== 'undefined' && currentAct === 'act2' ? 'Act2' : 'Act1'));
+    var data = act156CauseData(a);
+    var danger = data.clearCapable ? {text:'低', cls:''} : act156DangerFromScore(e.score, data.causes);
+    var comment = act156Comment(data);
+    var total = Number.isFinite(Number(e.score)) ? Math.round(Number(e.score)) : 0;
+    var rank = e.rank || '-';
+    var summary = data.clearCapable
+      ? '主要な勝ち筋が成立しており、火力・防御・スケールも高い水準です。大きな補強よりも、無理なルート選択・事故率を上げないピック・プレイ判断のブレに注意したい状態です。'
+      : (e.comment || '選択中Actでの総合評価を確認します。');
+    var enemyNotes = act156EnemyNote(data);
+    panel.innerHTML = '<div class="actDangerAnalysisTitle">Act別危険分析</div>'
+      + '<div class="actDangerAnalysisLead">このデッキが、選択中Actでどこから崩れやすいかを実戦ベースで表示します。</div>'
+      + '<div class="actDangerAnalysisRows">'
+      + act156RenderRow(label + ' 詳細診断', act156RenderTag('現在評価'), esc(label) + ' ' + esc(rank) + ' / 総合 ' + esc(total))
+      + act156RenderRow('総合コメント', act156RenderTag('Act評価'), esc(summary))
+      + act156RenderRow('危険度', act156RenderTag(danger.text, danger.cls), esc(comment))
+      + act156RenderRow('危険原因', data.causes.map(function(x){ return act156RenderTag(x, /不足|危険|事故/.test(x) ? 'warn' : ''); }).join(''), '選択中Actで優先して確認する弱点です。')
+      + act156RenderRow('必要カード', data.needs.map(function(x){ return act156RenderTag(x, 'warn'); }).join(''), '次のピックでは、この役割を持つカードを優先して探します。')
+      + act156RenderRow('敵種別', act156RenderTag('雑魚') + act156RenderTag('エリート','warn') + act156RenderTag('ボス','danger'), enemyNotes.map(esc).join('<br>'))
+      + '</div>';
+  }
+  function act156RemoveStandaloneActEvaluation(root){
+    if(!root) return;
+    arr(root.querySelectorAll('.advancedInsightCard')).forEach(function(el){
+      var title = ((el.querySelector('.advancedInsightTitle') || {}).textContent || '').trim();
+      if(title === 'Act評価') el.remove();
+    });
   }
 
+  // impl154: obsolete impl35 upper floating-card panel renderer removed; only cleanup remains.
   function cleanupFloatingDuplicatesImpl35(root){
     if(!root) return;
-    arr(root.querySelectorAll('.implementation35FloatingPriority,.implementation15FloatingPanel')).forEach(function(el){ el.remove(); });
+    // impl154: remove only obsolete upper duplicate floating-card panels.
+    // Keep the newer 「浮いてるカード検知：次の行動につなげる」 panel.
+    arr(root.querySelectorAll('.implementation35FloatingPriority')).forEach(function(el){ el.remove(); });
     arr(root.querySelectorAll('.advancedInsightCard')).forEach(function(el){
-      var title = (el.querySelector('.advancedInsightTitle') || {}).textContent || '';
-      if(/浮いてるカード|浮いているカード/.test(title)) el.remove();
+      var title = ((el.querySelector('.advancedInsightTitle') || {}).textContent || '').trim();
+      if(title === '浮いてるカード' || title === '浮いているカード') el.remove();
     });
+    // impl156: Act評価はAct別危険分析へ統合するため、独立カードは残さない。
+    act156RemoveStandaloneActEvaluation(root);
   }
 
   var prevRenderAdvancedImpl35 = window.renderAdvancedInsights;
@@ -23416,9 +23473,8 @@ const SILENT_PHASE1_CARDS = [
     window.renderAdvancedInsights = renderAdvancedInsights = function(a){
       prevRenderAdvancedImpl35.apply(this, arguments);
       var root = document.getElementById('advancedInsights');
-      if(!root) return;
-      cleanupFloatingDuplicatesImpl35(root);
-      root.insertAdjacentHTML('afterbegin', renderFloatingPriorityPanelImpl35(a));
+      if(root) cleanupFloatingDuplicatesImpl35(root);
+      act156UpdatePanel(a);
     };
   }
 
@@ -23589,7 +23645,13 @@ const SILENT_PHASE1_CARDS = [
   function hasCalc(c,t){ return arr(c && c.specialCalc).map(String).some(function(x){ return norm(x).indexOf(norm(t)) >= 0; }); }
   function isCard(c, names){ var n=norm(nameOf(c)+' '+(c&&c.id||'')+' '+(c&&c.nameEn||'')); return names.some(function(x){ return n.indexOf(norm(x)) >= 0; }); }
   function count(cards, fn){ return arr(cards).reduce(function(a,c){ return a + (fn(c)?1:0); }, 0); }
-  function cardOf(inst){ try{ return typeof cardById === 'function' ? cardById(inst.id || inst) : inst; }catch(e){ return inst; } }
+  function cardOf(inst){
+    try{
+      var base = typeof cardById === 'function' ? cardById(inst && (inst.id || inst.cardId || inst.name) || inst) : inst;
+      if(inst && typeof inst === 'object' && base && base !== inst) return Object.assign({}, base, {upgraded:!!inst.upgraded});
+      return base;
+    }catch(e){ return inst; }
+  }
   function cardsOf(deckList){ return arr(deckList).map(cardOf).filter(Boolean); }
   function isSilent(cards){ return arr(cards).some(function(c){ return c && c.character === 'silent'; }); }
 
@@ -23704,50 +23766,158 @@ const SILENT_PHASE1_CARDS = [
     var v = Number(m[key]);
     return Number.isFinite(v) ? v : 0;
   }
+  function stableDeckSeed(cards, character){
+    var counts = {};
+    arr(cards).forEach(function(c){
+      if(!c) return;
+      if(character && c.character && c.character !== character) return;
+      var key = str(c.id || c.cardId || c.nameJa || c.nameEn || c.name || c).replace(/\s+/g,'_');
+      if(!key) return;
+      key += ':' + (!!c.upgraded ? '1' : '0');
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    var signature = (character || '') + '|' + Object.keys(counts).sort().map(function(k){ return k + 'x' + counts[k]; }).join('|');
+    var h = 2166136261;
+    for(var i=0;i<signature.length;i++){
+      h ^= signature.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
   function chooseSilentDeckName(list, seed){
     list = arr(list).filter(Boolean);
     if(!list.length) return '';
     seed = Math.abs(Math.round(Number(seed) || 0));
     return list[seed % list.length];
   }
+  function silentNamePools(){
+    return {
+      knifeForming:['ナイフ形成中','ナイフは飛ぶ、まだ刺さらない','刃物多めの準備中','ナイフは多い、道筋待ち'],
+      knifeDrawEstablished:['ナイフ循環型','刃が回る','回して刺す','回るナイフ'],
+      knifeWeak:['刃は回る、守り待ち','ナイフは速い、防御待ち','ナイフはある、伸びがない','ナイフは速い、伸びがない','刺さる前に息切れ','ナイフ過多注意'],
+      poisonForming:['毒は盛った、時間がほしい','毒は育つ予定','毒仕込み中','静かに仕込む毒'],
+      poisonEstablished:['毒の長期契約','静かに削る','毒刃安定型','仕上がった毒刃','毒刃完成形'],
+      poisonDefenseEstablished:['耐えて毒勝ち','毒を待つ防御型','毒と守りの長期戦','防御継続で毒を待つ','毒を待てる手札'],
+      poisonWeak:['毒はある、時間がない','毒はある、防御がない','守りはある、毒待ち','毒は育つ、決め手は遅い','毒は濃い、手札は不安'],
+      slideForming:['スライ練習中','スライ準備型','スライで探す勝ち筋','仕込みスライ'],
+      slideEstablished:['スライで回す','スライ循環型','スライで繋ぐ','スライで軽くする','スライ手数型'],
+      slideWeak:['スライ先を探しています','スライはある、勝ちはまだ','スライはある、決め手待ち','スライ迷子','スライ迷走中'],
+      defenseEstablished:['防御継続型','静かに耐える','長く戦う準備','守ってナイフを回す','守れるスライ'],
+      defenseWeak:['守れるけど決め手待ち','防御はある、勝ち筋が薄い','回るけど勝ち筋が薄い'],
+      drawEstablished:['回り始めた手札','細いけど回る','回転優先中','手札は踊る','軽く回る手札'],
+      drawWeak:['回るけど決まらない','手札は回る、勝ちはまだ','回る手札、薄い決定打','回るけど火力待ち'],
+      zeroEstablished:['手数で押す','0コスト大行進','軽さで繋ぐナイフ','軽さで繋ぐスライ'],
+      zeroWeak:['軽い手札、薄い決め手','行動数はある、火力待ち','軽さだけは一流','手数はある、勝ちは薄い','0コストはある、勝ちは薄い'],
+      setupWeak:['仕込みは順調','仕込み中の刃','仕込み毒','仕込みナイフ','仕込みスライ','仕込みはある、初動待ち','準備はできる、初動が薄い','準備は長い','立ち上がり注意','準備だけは完璧'],
+      scatter:['毒もナイフも少しずつ','刃と毒の迷い道','毒ナイフ接続待ち','毒と刃の二択中','まだ刺さらない手札','勝ち筋は準備中','きれいに回る未完成']
+    };
+  }
   function finalSilentName(cards, result){
     var p = silentParts(cards, result || {});
+    var pool = silentNamePools();
     var axisScores = [p.discardScore,p.shivScore,p.poisonScore].filter(function(x){ return x>=38; }).length;
     var mixedSmall = axisScores>=2 && !p.discardReady && !p.shivReady && !p.poisonReady;
     var romanceUnready = p.romance>=2 && !p.discardReady && !p.shivReady && !p.poisonReady;
     var lightLoop = (p.discardAct + p.draw) >= 3;
     var fire=silentMetric(result,'火力'), defense=silentMetric(result,'防御'), draw=silentMetric(result,'ドロー'), scale=silentMetric(result,'スケール'), accident=silentMetric(result,'事故率');
     var energyLoad=Number(result && result.energyLoadScore) || 0, brick=Number(result && result.handBrickRate) || 0;
-    var seed=cards.length + p.shivGen*5 + p.poisonApply*7 + p.discardAct*11 + p.defense*13 + p.draw*17;
+    var seed=stableDeckSeed(cards,'silent') || (cards.length + p.shivGen*5 + p.poisonApply*7 + p.discardAct*11 + p.defense*13 + p.draw*17);
     var starterLike=false;
     try{ starterLike = (typeof isStarterLikeDeckForDisplay === 'function') && isStarterLikeDeckForDisplay({cards:cards}); }catch(e){ starterLike=false; }
     if(starterLike) return 'まだ何者でもない';
 
-    // 致命的弱点を先にデッキ名へ出す。勝ち筋分類は後段の分離処理に任せる。
-    if((brick >= 0.34 || accident >= 62 || energyLoad >= 78) && (draw < 45 || defense < 45 || energyLoad >= 78)){
-      return chooseSilentDeckName(energyLoad >= 78 ? ['立ち上がりが重い','助走で転ぶデッキ'] : ['回る前に死ぬ','準備中に殴られる','助走で転ぶデッキ'], seed);
+    function hasMeaningfulKnifeNameStart(){
+      return !!(p.shivReady || p.shivGen >= 2 || (p.shivGen >= 1 && (p.shivBoost >= 1 || p.draw >= 2 || p.zero >= 2 || p.defense >= 3)));
     }
-    if(defense > 0 && defense < 36 && (p.setup > 0 || p.romance > 0 || axisScores > 0)) return chooseSilentDeckName(['受け身が薄い','守りが追いつかない','危ない受け身','防御の穴だらけ'], seed);
-    if(fire > 0 && fire < 38 && (draw >= 45 || lightLoop || p.defense >= 3)) return chooseSilentDeckName(['削り切れない刃','火力待ち','あと一押し足りない','後半の刃が鈍い'], seed);
-    if(scale > 0 && scale < 38 && (defense >= 55 || p.defense >= 4) && fire < 55) return '泥沼の戦い';
-    if(p.aoe < 1 && cards.length >= 11 && fire >= 48 && defense >= 42) return chooseSilentDeckName(['横並びが怖い','一体ずつしか倒せない','群れに弱いデッキ','複数戦で崩れる'], seed);
+    function softKnifeFormingPool(){
+      return hasMeaningfulKnifeNameStart() ? pool.knifeForming : ['ナイフは飛ぶ、まだ刺さらない','刃物多めの準備中','ナイフは多い、道筋待ち','勝ち筋は準備中'];
+    }
+    function chooseSilentCompoundName(){
+      var list=[];
+      var lowDefenseName = (defense > 0 && defense < 36) || p.defense < 2;
+      var lowFireName = (fire > 0 && fire < 38);
+      if(p.shivReady && p.draw >= 2){
+        list = list.concat(lowDefenseName ? pool.knifeWeak : pool.knifeDrawEstablished);
+        if(!lowDefenseName && p.zero >= 3) list = list.concat(pool.zeroEstablished);
+        if(!lowDefenseName && p.defense >= 4) list = list.concat(pool.defenseEstablished);
+      }
+      if(p.poisonReady && p.defense >= 3){
+        list = list.concat(pool.poisonDefenseEstablished);
+        if(p.draw >= 2) list = list.concat(pool.poisonEstablished);
+      }
+      if(p.discardReady && (p.draw >= 2 || lightLoop)){
+        list = list.concat((lowFireName || p.discardDamage < 1) ? pool.slideWeak.concat(pool.drawWeak) : pool.slideEstablished.concat(pool.drawEstablished));
+      }
+      if(p.zero >= 3 && (p.shivReady || p.discardReady || p.draw >= 2)){
+        list = list.concat(lowFireName ? pool.zeroWeak : pool.zeroEstablished);
+      }
+      return list.length ? chooseSilentDeckName(list, seed) : '';
+    }
+    var catastrophicNameRisk = (brick >= 0.42 || accident >= 75 || energyLoad >= 90) && (draw < 35 || defense < 35 || energyLoad >= 90);
+    var compoundName = catastrophicNameRisk ? '' : chooseSilentCompoundName();
+    if(compoundName) return compoundName;
 
-    if(p.discardReady) return p.discardScore>=82 ? chooseSilentDeckName(['スライで回る','手札循環デッキ','捨てて進む','回転する山札'],seed) : chooseSilentDeckName(['スライの入口','回す準備','手札を動かすデッキ','捨てて得する準備','循環待ち'],seed);
-    if(p.shivReady) return p.shivScore>=82 ? chooseSilentDeckName(['ナイフで刻む','刃の嵐','手数で削る','ナイフ完成形'],seed) : chooseSilentDeckName(['ナイフの芽','刃を並べる準備','手数で押す準備','ナイフ待ち','小さな刃の群れ'],seed);
-    if(p.poisonReady) return p.poisonScore>=82 ? chooseSilentDeckName(['毒で沈める','毒殺プラン','長期毒デッキ','触媒待ちの毒'],seed) : chooseSilentDeckName(['毒の芽','毒で削る準備','じわじわ倒すデッキ','毒待ち','時間を味方にする毒'],seed);
-    if(romanceUnready) return p.romance>=4 ? '噛み合い待ち' : '成立待ち';
-    if(mixedSmall) return axisScores>=3 ? '方向性が散っています' : '軽量混成';
-    if(axisScores>=2) return '軽量混成';
-    if(lightLoop) return chooseSilentDeckName(['軽量循環未完成','まだ細い循環','手札を動かすデッキ','循環待ち'],seed);
-    if(p.poisonApply > 0 || p.poisonCards > 0) return chooseSilentDeckName(['毒の芽','崩れやすい毒','毒待ち'],seed);
-    if(p.shivGen > 0 || p.shivBoost > 0) return chooseSilentDeckName(['ナイフの芽','初動不安定ナイフ','ナイフ待ち'],seed);
-    if((p.discardAct + p.draw) > 0) return chooseSilentDeckName(['まだ細い循環','スライの入口','回す準備'],seed);
-    if(p.defense >= 4) return '防御先行コントロール';
-    if(p.front>=2) return '火力準備中';
+    // 1. 致命的な重さ・初動不足。完成名は出さず、形成中/不足プールへ寄せる。
+    if((brick >= 0.34 || accident >= 62 || energyLoad >= 78) && (draw < 45 || defense < 45 || energyLoad >= 78)){
+      return chooseSilentDeckName(pool.setupWeak.concat(pool.zeroWeak), seed);
+    }
+    if(defense > 0 && defense < 36 && (p.setup > 0 || p.romance > 0 || axisScores > 0)){
+      if(p.shivGen > 0 || p.shivReady) return chooseSilentDeckName(pool.knifeWeak, seed);
+      if(p.poisonApply > 0 || p.poisonReady) return chooseSilentDeckName(pool.poisonWeak, seed);
+      if(lightLoop || p.discardReady) return chooseSilentDeckName(pool.drawWeak.concat(pool.slideWeak), seed);
+      return chooseSilentDeckName(pool.setupWeak, seed);
+    }
+    if(fire > 0 && fire < 38 && (draw >= 45 || lightLoop || p.defense >= 3)){
+      if(p.discardReady || lightLoop) return chooseSilentDeckName(pool.drawWeak.concat(pool.slideWeak), seed);
+      if(p.defense >= 3) return chooseSilentDeckName(pool.defenseWeak, seed);
+      return chooseSilentDeckName(pool.zeroWeak, seed);
+    }
+    if(scale > 0 && scale < 38 && (defense >= 55 || p.defense >= 4) && fire < 55) return chooseSilentDeckName(pool.defenseWeak.concat(pool.poisonWeak), seed);
+
+    var hasEstablishedSilentMainSupportForName = (p.shivReady && p.shivScore >= 82 && p.defense >= 3 && p.draw >= 2)
+      || (p.poisonReady && p.poisonScore >= 82 && p.defense >= 3 && p.draw >= 2)
+      || (p.discardReady && p.discardScore >= 82 && p.defense >= 2 && p.draw >= 2);
+
+    // AoE不足だけをデッキ名の主役にしない。成立前なら接続不足/形成中名へ寄せる。
+    if(!hasEstablishedSilentMainSupportForName && p.aoe < 1 && cards.length >= 11 && fire >= 48 && defense >= 42){
+      if(mixedSmall || axisScores >= 2) return chooseSilentDeckName(pool.scatter, seed);
+      if(p.shivGen > 0) return chooseSilentDeckName(softKnifeFormingPool(), seed);
+      if(p.poisonApply > 0) return chooseSilentDeckName(pool.poisonForming, seed);
+      if(p.discardAct > 0) return chooseSilentDeckName(pool.slideForming, seed);
+    }
+
+    // 2. 主軸＋補助軸が成立している複合プールを優先。
+    if(p.shivReady && p.shivScore >= 82){
+      if(p.draw >= 2 && p.defense >= 3) return chooseSilentDeckName(pool.knifeDrawEstablished.concat(pool.zeroEstablished), seed);
+      if(p.draw >= 2) return chooseSilentDeckName(pool.knifeDrawEstablished.concat(pool.knifeWeak), seed);
+      return chooseSilentDeckName(softKnifeFormingPool().concat(pool.knifeWeak), seed);
+    }
+    if(p.poisonReady && p.poisonScore >= 82){
+      if(p.defense >= 3 && p.draw >= 2) return chooseSilentDeckName(pool.poisonDefenseEstablished.concat(pool.poisonEstablished), seed);
+      if(p.defense >= 3) return chooseSilentDeckName(pool.poisonDefenseEstablished, seed);
+      return chooseSilentDeckName(pool.poisonWeak.concat(pool.poisonForming), seed);
+    }
+    if(p.discardReady && p.discardScore >= 82){
+      if((fire > 0 && fire < 45) || p.discardDamage < 1) return chooseSilentDeckName(pool.slideWeak.concat(pool.drawWeak), seed);
+      return chooseSilentDeckName(pool.slideEstablished.concat(pool.drawEstablished), seed);
+    }
+
+    // 3. 単一軸成立/形成中。
+    if(p.defense >= 4 && (p.poisonApply > 0 || p.poisonReady)) return chooseSilentDeckName(pool.poisonDefenseEstablished.concat(pool.defenseEstablished), seed);
+    if(p.defense >= 4 && (p.shivGen > 0 || p.discardAct > 0)) return chooseSilentDeckName(pool.defenseEstablished, seed);
+    if(p.zero >= 3 && (p.shivGen > 0 || p.discardAct > 0 || p.draw >= 2)) return chooseSilentDeckName((fire > 0 && fire < 45) ? pool.zeroWeak : pool.zeroEstablished, seed);
+    if(p.draw >= 3 || lightLoop) return chooseSilentDeckName((fire > 0 && fire < 45) ? pool.drawWeak : pool.drawEstablished, seed);
+    if(p.poisonApply > 0 || p.poisonPay > 0) return chooseSilentDeckName(p.defense < 3 ? pool.poisonWeak : pool.poisonForming, seed);
+    if(p.shivGen > 0 || p.shivBoost > 0) return chooseSilentDeckName((p.defense > 0 && p.defense < 3) ? pool.knifeWeak : softKnifeFormingPool(), seed);
+    if((p.discardAct + p.draw) > 0) return chooseSilentDeckName(p.discardPay > 0 ? pool.slideForming : pool.slideWeak, seed);
+    if(p.setup > 0) return chooseSilentDeckName(pool.setupWeak, seed);
+    if(romanceUnready || mixedSmall || axisScores>=2) return chooseSilentDeckName(pool.scatter, seed);
+    if(p.defense >= 4) return chooseSilentDeckName(pool.defenseEstablished, seed);
+    if(p.front>=2) return chooseSilentDeckName(pool.zeroWeak.concat(pool.setupWeak), seed);
     return chooseSilentDeckName(['方向模索中','迷子のデッキ','方向待ち','これから決めるデッキ'],seed);
   }
   function cleanDeckName(n){
-    n = str(n).replace(/undefined|null|\[object Object\]/g,'').trim();
+    n = str(n).replace(/undefined|null|\[object Object\]/g,'').replace(/ディスカード|捨て札|discard/gi,'スライ').replace(/捨てて/g,'スライで').trim();
     if(!n || /(Knife|Discard Rotation|Poison Silent|毒 Silent|メメント・?モリ Silent)/i.test(n)) n='方向模索中';
     return n.replace(/\s*サイレント\s*$/,'').replace(/\s+/g,'').trim() || '方向模索中';
   }
@@ -23759,7 +23929,7 @@ const SILENT_PHASE1_CARDS = [
         result.deckName = name;
         if(result.diagnosis) result.diagnosis = Object.assign({}, result.diagnosis, {name:name});
         else result.diagnosis = {name:name, warnings:[], missing:[]};
-        if(result.winCondition) result.winCondition = Object.assign({}, result.winCondition, {name:name, displayName:name});
+        if(result.winCondition) result.winCondition = Object.assign({}, result.winCondition, {name:name, deckName:name, displayName:name});
       }
       return result;
     });
@@ -24017,6 +24187,7 @@ const SILENT_PHASE1_CARDS = [
     if(!raw) return null;
     if(['silent','サイレント'].indexOf(raw) >= 0) return implemented('silent') ? 'silent' : null;
     if(['ironclad','アイアンクラッド','アイクラ'].indexOf(raw) >= 0) return implemented('ironclad') ? 'ironclad' : null;
+    if(['regent','リージェント','リージェント（仮）','リージェント(仮)'].indexOf(raw) >= 0) return implemented('regent') ? 'regent' : null;
     try{
       var found = arr(window.HEROES || HEROES).find(function(h){
         return [h.id,h.name,h.nameJa].some(function(x){ return lower(x) === raw; });
@@ -24058,6 +24229,7 @@ const SILENT_PHASE1_CARDS = [
     if(!matches.length) return null;
     return matches.find(function(c){ return belongsTo(c, characterId); }) ||
            matches.find(isSharedCard) ||
+           (matches.length === 1 ? matches[0] : null) ||
            null;
   };
   function sourceText(){
@@ -24099,7 +24271,14 @@ const SILENT_PHASE1_CARDS = [
       for(var i=0;i<n;i++) next.push({id:found.id, upgraded:upgraded, enchanted:enchanted});
     });
     if(!next.length) return;
-    var changed = explicit && explicit !== previousHero;
+    if(!explicit){
+      try{
+        var importedCards = next.map(function(x){ return typeof cardById === 'function' ? cardById(x.id) : null; }).filter(Boolean);
+        var detected = (typeof detectPrimaryDeckCharacter === 'function') ? detectPrimaryDeckCharacter(importedCards) : null;
+        if(detected && implemented(detected)) targetCharacter = detected;
+      }catch(e){}
+    }
+    var changed = targetCharacter !== previousHero;
     window.deck = deck = next;
     window.currentHero = currentHero = targetCharacter;
     window.currentCharacter = currentCharacter = targetCharacter;
@@ -24287,6 +24466,7 @@ const SILENT_PHASE1_CARDS = [
     if(!matches.length) return null;
     return matches.find(function(c){ return belongsTo(c, characterId); }) ||
            matches.find(isSharedCard) ||
+           (matches.length === 1 ? matches[0] : null) ||
            null;
   };
   function sourceText(){
@@ -24447,12 +24627,11 @@ const SILENT_PHASE1_CARDS = [
     }catch(e){ return null; }
   }
   function activeCharacter(){
-    var character = normalizeCharacterId((typeof currentCharacter !== 'undefined' && currentCharacter) || window.currentCharacter || '');
     var hero = normalizeCharacterId((typeof currentHero !== 'undefined' && currentHero) || window.currentHero || '');
-    if(character === 'regent' || hero === 'regent') return 'regent';
-    if(implemented(character)) return character;
+    var character = normalizeCharacterId((typeof currentCharacter !== 'undefined' && currentCharacter) || window.currentCharacter || '');
     if(implemented(hero)) return hero;
-    return character || hero || 'ironclad';
+    if(implemented(character)) return character;
+    return hero || character || 'ironclad';
   }
   function implemented(id){
     id = normalizeCharacterId(id) || id;
@@ -24464,8 +24643,11 @@ const SILENT_PHASE1_CARDS = [
     return id && implemented(id) ? id : null;
   }
   function setGlobals(heroId){
+    heroId = normalizeHero(heroId) || heroId || 'ironclad';
     window.currentHero = currentHero = heroId;
     window.currentCharacter = currentCharacter = heroId;
+    try{ window.cardListCharacter = cardListCharacter = heroId; }catch(e){}
+    try{ window.pendingCharacter = pendingCharacter = heroId; }catch(e){}
   }
   function isBane(inst){ return inst && (inst.id === 'curse_ascenders_bane' || inst.nameJa === 'アセンダーの災い' || inst.nameEn === "Ascender's Bane"); }
   function ensureBaneUnique(){
@@ -24501,6 +24683,9 @@ const SILENT_PHASE1_CARDS = [
 
   window.detectPrimaryDeckCharacter = detectPrimaryDeckCharacter = function(cards){
     var keep = activeCharacter();
+    // 分析対象はスターター選択側(currentHero/currentCharacter)を優先する。
+    // カード一覧から他キャラカードを混ぜても、分析キャラは勝手に変えない。
+    if(implemented(keep)) return keep;
     var supported = ['ironclad','silent','regent','necrobinder','defect'];
     var counts = {};
     supported.forEach(function(id){ counts[id] = 0; });
@@ -24509,15 +24694,13 @@ const SILENT_PHASE1_CARDS = [
       if(counts[c.character] !== undefined) counts[c.character] += 1;
       arr(c.groups).forEach(function(g){ if(counts[g] !== undefined) counts[g] += 1; });
     });
-    if(counts.regent > 0) return 'regent';
     var best = supported.slice().sort(function(a,b){ return counts[b] - counts[a]; })[0];
     if(counts[best] > 0) return best;
-    return implemented(keep) ? keep : 'ironclad';
+    return 'ironclad';
   };
 
   window.getAnalysisCharacter = getAnalysisCharacter = function(deckList){
-    var list = arr(deckList || (window.deck || deck)).map(function(x){ try{ return getCard(x); }catch(e){ return null; } }).filter(Boolean);
-    return window.detectPrimaryDeckCharacter(list);
+    return window.detectPrimaryDeckCharacter([]);
   };
 
   window.findCardForImportedDeck = function(rawName, heroId){
@@ -24539,6 +24722,7 @@ const SILENT_PHASE1_CARDS = [
     if(!matches.length) return null;
     return matches.find(function(c){ return belongsTo(c, heroId); }) ||
            matches.find(isSharedCard) ||
+           (matches.length === 1 ? matches[0] : null) ||
            null;
   };
 
@@ -24591,7 +24775,7 @@ const SILENT_PHASE1_CARDS = [
       rarityFilter = 'all';
       tagFilter = 'all';
       currentSearchText = '';
-      pendingCharacter = currentCharacter;
+      pendingCharacter = cardListCharacter || currentCharacter;
       pendingCategory = currentCategory;
       pendingTypeFilter = typeFilter;
       pendingRarityFilter = rarityFilter;
@@ -24746,22 +24930,39 @@ const SILENT_PHASE1_CARDS = [
   };
 
   window.setCardListCharacter = setCardListCharacter = function(heroId){
-    var selectable = heroId === 'all' || heroId === 'colorless' || heroId === 'regent' || implemented(heroId);
+    var normalized = normalizeHero(heroId);
+    var target = normalized || heroId;
+    var selectable = target === 'all' || target === 'colorless' || target === 'regent' || implemented(target);
     if(!selectable) return;
     try{
-      pendingCharacter = heroId;
+      // カード一覧側のキャラ選択は、検索・追加用フィルタだけを切り替える。
+      // currentHero/currentCharacter はスターター選択側の分析対象として維持する。
+      window.cardListCharacter = cardListCharacter = target;
+      pendingCharacter = target;
+      currentCategory = 'normal';
       pendingCategory = 'normal';
+      typeFilter = 'all';
       pendingTypeFilter = 'all';
+      rarityFilter = 'all';
       pendingRarityFilter = 'all';
+      tagFilter = 'all';
       pendingTagFilter = 'all';
+      currentSearchText = '';
+      pendingSearchText = '';
       var searchEl = document.getElementById('search');
-      pendingSearchText = searchEl ? String(searchEl.value || '') : String(pendingSearchText || '');
+      if(searchEl) searchEl.value = '';
+      if(typeof resetCardListRenderCache === 'function') resetCardListRenderCache(true);
     }catch(e){}
     try{ if(typeof syncPendingFilterButtons === 'function') syncPendingFilterButtons(); }catch(e){}
     try{ if(typeof renderCharacters === 'function') renderCharacters(); }catch(e){}
+    try{ if(typeof renderCurrentCharacterBadges === 'function') renderCurrentCharacterBadges(); }catch(e){}
+    try{ if(typeof renderMissingCards === 'function') renderMissingCards(); }catch(e){}
+    try{ if(cardDbVisible() && typeof renderCards === 'function') renderCards(); }catch(e){}
     try{ if(typeof updateFilterPendingNotice === 'function') updateFilterPendingNotice(); }catch(e){}
   };
 
+  try{ window.cardListCharacter = cardListCharacter; }catch(e){}
+  window.activeCharacter = activeCharacter;
   window.refreshAfterCharacterChange = refreshAfterCharacterChange = function(){ lightRefresh(true, cardDbVisible()); };
   window.refreshAfterDeckMutation = refreshAfterDeckMutation = function(){ lightRefresh(false, cardDbVisible()); };
   window.resetStarterDeck = resetStarterDeck = function(){
@@ -24827,6 +25028,7 @@ const SILENT_PHASE1_CARDS = [
     if(typeof window.markDemoDeckEdited === 'function') window.markDemoDeckEdited();
     window.deck = deck = next;
     setGlobals(target);
+    resetFilters();
     lightRefresh(target !== previous, cardDbVisible());
   };
   window.loadDeckCodeFromDiagnosis = loadDeckCodeFromDiagnosis = function(){
@@ -25092,6 +25294,92 @@ const SILENT_PHASE1_CARDS = [
     }
     return dfs(arr(hand), {energy:3,strength:0,vulnerable:0,block:0}, 0);
   }
+
+  // impl162: キャラ別勝ち筋分類・テンプレート分離・総合診断反映修正
+  function impl162CardsOf(deckList){
+    try{ return cardsOf(deckList || []); }catch(e){ return (deckList || []).map(function(x){ try{ return cardOf(x) || x; }catch(_){ return x; } }).filter(Boolean); }
+  }
+  function impl162Name(c){ return cleanText((c && (c.nameJa || c.name || c.id || c.nameEn)) || ''); }
+  function impl162Has(cards, names){
+    names = Array.isArray(names) ? names : [names];
+    return cards.some(function(c){ var n=impl162Name(c).toLowerCase(); var id=String(c && c.id || '').toLowerCase(); return names.some(function(x){ x=String(x).toLowerCase(); return n===x || id===x || n.indexOf(x)>=0 || id.indexOf(x)>=0; }); });
+  }
+  function impl162Count(cards, names){
+    names = Array.isArray(names) ? names : [names];
+    return cards.filter(function(c){ return impl162Has([c], names); }).length;
+  }
+  function impl162SilentPackage(cards){
+    var silent = cards.some(function(c){ return c && c.character === 'silent'; });
+    if(!silent) return null;
+    var shivGen = impl162Count(cards, ['剣の舞','刃の舞','外套と短剣','blade_dance','cloak_and_dagger','silent_blade_dance','silent_cloak_and_dagger']);
+    var shivPayoff = impl162Count(cards, ['精度上昇','とどめの一撃','残像','accuracy','finisher','after_image','silent_accuracy','silent_finisher','silent_after_image']);
+    var support = impl162Count(cards, ['アドレナリン','アクロバット','バックフリップ','フットワーク','ブラー','足払い','金切り声','残像','adrenaline','acrobatics','backflip','footwork','blur','leg_sweep','piercing_wail','after_image']);
+    var poisonApply = impl162Count(cards, ['毒の一刺し','致死毒','有毒ガス','バウンドフラスコ','腐食の波','poisoned_stab','deadly_poison','noxious_fumes','bouncing_flask','crippling_cloud']);
+    var poisonPayoff = impl162Count(cards, ['促進剤','触媒','死体爆破','catalyst','corpse_explosion']);
+    var poisonSupport = impl162Count(cards, ['バックフリップ','フットワーク','足払い','金切り声','ブラー','残像','backflip','footwork','leg_sweep','piercing_wail','blur','after_image']);
+    var discardAct = impl162Count(cards, ['ダガースロー','アクロバット','準備','計算された賭け','サバイバー','商売道具','dagger_throw','acrobatics','prepared','calculated_gamble','survivor','tools_of_the_trade']);
+    var discardPay = impl162Count(cards, ['反射','反射神経','策士','腹裂き','メメント・モリ','reflex','tactician','eviscerate','memento']);
+    var discardSupport = impl162Count(cards, ['アドレナリン','アクロバット','用意周到','集中','バックフリップ','adrenaline','acrobatics','well_laid_plans','concentrate','backflip']);
+    var knife = shivGen >= 2 && shivPayoff >= 2 && support >= 4;
+    var poison = poisonApply >= 3 && poisonPayoff >= 1 && poisonSupport >= 3;
+    var slide = discardAct >= 3 && discardPay >= 2 && discardSupport >= 2;
+    if(knife) return {complete:true, character:'silent', primary:'ナイフ軸', supports:['防御継続'], summary:'ナイフ生成・強化・手数・防御継続がつながっており、ナイフ軸は成立しています。', tags:['ナイフ','手数','防御継続']};
+    if(poison) return {complete:true, character:'silent', primary:'毒軸', supports:['防御継続'], summary:'毒付与・毒加速・耐久がつながっており、毒軸は成立しています。', tags:['毒付与','毒加速','耐久']};
+    if(slide) return {complete:true, character:'silent', primary:'スライ軸', supports:['ドロー循環'], summary:'スライ起動札・コンボ札・循環がつながっており、スライ軸は成立しています。', tags:['スライ起動','コンボ','循環']};
+    return null;
+  }
+  function impl162IronPackage(cards){
+    var iron = cards.some(function(c){ return c && c.character === 'ironclad'; });
+    if(!iron) return null;
+    var exhaust = impl162Has(cards,'堕落') && impl162Has(cards,'無痛') && (impl162Has(cards,'セカンドウィンド') || impl162Has(cards,'鬼火') || impl162Has(cards,'戦いのドラム') || impl162Count(cards,['堕落','無痛','セカンドウィンド','鬼火','戦いのドラム','corruption','feel_no_pain','second_wind','fiend_fire','battle_drum']) >= 4);
+    var block = impl162Has(cards,'バリケード') && impl162Has(cards,'ボディスラム') && (impl162Count(cards,['不動','炎の障壁','受け流し','盤石','武装解除','impervious','flame_barrier','shrug','entrench','disarm']) >= 2 || impl162Has(cards,'ジャガーノート'));
+    var strength = (impl162Has(cards,'悪魔化') || impl162Count(cards,['発火','リミットブレイク','inflame','limit_break']) >= 2) && impl162Count(cards,['ツインストライク','ソードブーメラン','死神','ワン・ツーパンチ','twin_strike','sword_boomerang','reaper']) >= 1;
+    if(strength) return {complete:true, character:'ironclad', primary:'筋力軸', supports:['フロントロード軸'], summary:'筋力供給と多段攻撃・決定打がつながっており、筋力軸は成立しています。', tags:['筋力供給','多段攻撃','決定打']};
+    if(block) return {complete:true, character:'ironclad', primary:'防御軸', supports:exhaust?['廃棄軸']:[], summary:'バリケード・ボディスラム・高防御札がつながっており、防御から火力へ変換する勝ち筋が成立しています。', tags:['ブロック','火力変換','継戦能力']};
+    if(exhaust) return {complete:true, character:'ironclad', primary:'廃棄軸', supports:['防御軸'], summary:'堕落・無痛・廃棄札がつながっており、廃棄による循環と防御変換が成立しています。', tags:['廃棄','循環','防御変換']};
+    return null;
+  }
+  function impl162State(score){ return typeof winConditionState === 'function' ? winConditionState(score) : {label:'A（成立）', cls:'ok', rank:'A'}; }
+  function impl162Axis(name, summary, tags, score, character){
+    var st = impl162State(score || 88);
+    return {key:name, name:name, title:name, axis:name, score:score || 88, state:st, stage:st, summary:summary, reason:summary, needs:tags||['大きな不足なし'], tags:tags||['大きな不足なし'], character:character};
+  }
+  function impl164OverallAOrBetter(result){
+    var e = (result && result.actEvaluation) || {};
+    var rank = String(e.rank || '').toUpperCase();
+    var score = Number(e.score) || 0;
+    return (rank === 'S' || rank === 'A') && score >= 70;
+  }
+  function impl162ApplyPackage(result, cards){
+    var pkg = impl162IronPackage(cards) || impl162SilentPackage(cards);
+    if(!pkg || !pkg.complete) return result;
+    var main = impl162Axis(pkg.primary, pkg.summary, pkg.tags, 90, pkg.character);
+    var supports = (pkg.supports || []).filter(Boolean).map(function(n){
+      var text = n === '防御継続' ? '防御継続が主軸を支えています。' : n === '廃棄軸' ? '廃棄札が防御・循環の支えとして機能しています。' : n + 'が主軸を支えています。';
+      return impl162Axis(n, text, ['補助','接続済み'], 76, pkg.character);
+    });
+    var axes = [main].concat(supports);
+    result.impl162CompletePackage = pkg;
+    result.clearCapablePackage = Object.assign({}, pkg);
+    result.characterWinValidation = Object.assign({}, result.characterWinValidation || {}, {
+      character: pkg.character, axes: axes, winConditionAxes: axes, majorAxisCheck: axes, mainAxis: main, supportAxes: supports, state: main.state, completion: Math.max(num(result.characterWinValidation && result.characterWinValidation.completion), 90), conclusion: '主軸：' + pkg.primary + ' 成立。' + pkg.summary + (impl164OverallAOrBetter(result) ? ' クリア圏内として扱います。' : '')
+    });
+    result.winConditionAxes = axes.map(function(a){ return a.name; });
+    result.winCondition = Object.assign({}, result.winCondition || {}, {name:pkg.primary, title:pkg.primary, mainAxis:pkg.primary, mainAxisName:pkg.primary, subAxes:supports.map(function(a){return a.name;}), mixedName:[pkg.primary].concat(supports.map(function(a){return a.name;})).join('＋'), completion:Math.max(num(result.winCondition && result.winCondition.completion),90), state:main.state, reasons:[pkg.summary]});
+    result.diagnosis = Object.assign({}, result.diagnosis || {});
+    if(impl164OverallAOrBetter(result)){
+      result.diagnosis.summary = 'クリア圏内。' + pkg.summary + ' 大きな補強よりも、事故率を上げないピックとプレイ判断を確認する段階です。';
+    }
+    // impl165: 完成パッケージでも不足タグは消さない。
+    // クリアできるデッキにも注意点・浮き札は存在するため、総合診断だけで扱いを整理する。
+    return result;
+  }
+  if(typeof window.registerAnalyzeDeckPostProcessor === 'function'){
+    window.registerAnalyzeDeckPostProcessor(function(result, deckList){
+      return impl162ApplyPackage(result, impl162CardsOf(deckList || []));
+    });
+  }
+
   if(typeof bestTurn === 'function'){
     var prevBestTurn44 = bestTurn;
     window.bestTurn = bestTurn = function(hand, deckList, mode){
@@ -25758,10 +26046,13 @@ const SILENT_PHASE1_CARDS = [
       .replace(/\[object Object\]/g,'')
       .replace(/\bundefined\b/g,'')
       .replace(/\bnull\b/g,'')
+      .replace(/序盤火力が薄くです/g,'序盤火力が薄い場合は成立前に押し切られやすいです')
+      .replace(/薄くです/g,'薄いです')
       .replace(/少なくです/g,'少ないです')
       .replace(/エナジー・ドロー支援が少なく、必要なターンに使えない可能性があります/g,'支える基盤が不足しています')
       .replace(/高コストカードですが、支える基盤が不足しています/g,'支える基盤が不足しています')
-      .replace(/全・体攻撃性能/g,'全体攻撃性能')
+      .replace(/全・体攻撃性能/g,'AoE性能')
+      .replace(/全体攻撃性能/g,'AoE性能')
       .replace(/全・体/g,'全体')
       .replace(/圧・縮/g,'圧縮')
       .replace(/継・戦能力/g,'継戦能力')
@@ -26245,7 +26536,11 @@ const SILENT_PHASE1_CARDS = [
     if(!x) return x;
     if(x.nameJa || x.type || x.character) return x;
     var id = x.id || x.cardId || x.name || x;
-    try{ return typeof cardById === 'function' ? cardById(id) : x; }catch(e){ return x; }
+    try{
+      var base = typeof cardById === 'function' ? cardById(id) : x;
+      if(x && typeof x === 'object' && base && base !== x) return Object.assign({}, base, {upgraded:!!x.upgraded});
+      return base;
+    }catch(e){ return x; }
   }
   function cardsOf(list){ return arr(list || (typeof deck !== 'undefined' ? deck : [])).map(cardOf).filter(Boolean); }
   function isSilent(cards){ return arr(cards).some(function(c){ return c && c.character === 'silent'; }); }
@@ -26293,6 +26588,24 @@ const SILENT_PHASE1_CARDS = [
       special: count(cards,function(c){ return ['堕落','無痛','鬼火','バリケード','暴走','ジャガーノート','ボディスラム','悪魔化','原始の力'].indexOf(cleanName(c))>=0; })
     };
   }
+  function stableDeckSeed(cards, character){
+    var counts = {};
+    arr(cards).forEach(function(c){
+      if(!c) return;
+      if(character && c.character && c.character !== character) return;
+      var key = str(c.id || c.cardId || c.nameJa || c.nameEn || c.name || c).replace(/\s+/g,'_');
+      if(!key) return;
+      key += ':' + (!!c.upgraded ? '1' : '0');
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    var signature = (character || '') + '|' + Object.keys(counts).sort().map(function(k){ return k + 'x' + counts[k]; }).join('|');
+    var h = 2166136261;
+    for(var i=0;i<signature.length;i++){
+      h ^= signature.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
   function chooseDeckName(list, seed){
     list = arr(list).filter(Boolean);
     if(!list.length) return '';
@@ -26306,10 +26619,37 @@ const SILENT_PHASE1_CARDS = [
   function aoeCount(cards){
     return count(cards,function(c){ return hasTag(c,'AoE') || hasTag(c,'AoE攻撃') || hasTag(c,'AoE毒') || hasTag(c,'全体攻撃') || num(c && c.aoe) > 0 || /全体/.test(cleanName(c)); });
   }
+  function ironcladNamePools(){
+    return {
+      frontEstablished:['燃える前に殴る','火力は前のめり','殴れるうちに殴る'],
+      frontScaleWeak:['初動突破、後半未定','殴る準備だけ万全','火力前のめり、防御待ち','殴りは強い、後半が細い'],
+      strengthEstablished:['筋力点火','勝ち筋成立の鉄拳','仕上がった鉄塊','鉄拳完成形'],
+      strengthMulti:['筋力連打型','殴るほど強い','多段筋肉','筋力連打、手札待ち'],
+      strengthWeak:['筋肉はある、手数がない','筋力は本物、手札は課題','筋力点火待ち'],
+      defenseEstablished:['守って殴る鉄壁','守り優先デッキ','粘る鉄塊','守り勝つ準備'],
+      bodySlam:['盾から殴る','鉄壁から一撃','積んで叩く鉄壁','ブロック変換型','守って殴る鉄壁'],
+      barricadeForming:['バリケード工事中','バリケード要塞化計画','積む前に耐える','要塞準備中'],
+      barricadeEstablished:['ブロック貯金型','貯めて勝つ鉄壁','長期戦バリケード'],
+      defenseWeak:['ブロックだけは一人前','守りは本物、火力は相談','盾はある、勝ちはまだ','盾は厚い、勝ち筋待ち','防御だけの鉄塊','防御はある、決め手待ち','貯まる防御、足りない決定打','守れるけど勝ち切れない'],
+      exhaustEstablished:['燃やして整える','燃やして守る','燃やして殴る','手札を燃やす鉄塊','燃える手札'],
+      exhaustFeelNoPain:['廃棄で耐える','無痛廃棄エンジン','痛くない廃棄'],
+      corruptionForming:['堕落待ち廃棄','堕落前夜','堕落が回れば勝負'],
+      corruptionEstablished:['堕落で回す廃棄','堕落前提の重労働'],
+      fiendFireForming:['鬼火待ち廃棄','鬼火着火待ち','鬼火待ち廃棄工場'],
+      fiendFireEstablished:['鬼火で片付ける','燃やして殴る'],
+      exhaustWeak:['廃棄はした、得はまだ','廃棄だけ先行','廃棄はある、得が薄い','燃える素材は揃った'],
+      energyEstablished:['重いけど回る','重いけど回り始めた','大技を撃つ準備','暴走準備完了'],
+      energyWeak:['エナジーだけ元気','大技待ちの鉄塊','燃料はある、炉がない','エナジーはある、使い先待ち','エナジー過多の鉄拳'],
+      longEstablished:['長期戦の鉄壁','耐えて伸ばす','粘る鉄塊'],
+      longForming:['長期戦の構え','長期戦は見える、決め手待ち','長期戦の勝ち筋待ち','削り切る予定'],
+      scatter:['全部強そう、まだ噛み合わない','まだ噛み合わない鉄塊','鉄塊の寄せ集め']
+    };
+  }
   function buildNames(cards, result){
-    var p=profile(cards), deckName='方向待ち';
+    var p=profile(cards), pool=ironcladNamePools(), deckName='方向待ち';
     function oldAxisHints(){
       if(!cards.length || p.baseOnly) return ['主軸未確定'];
+      if(hasBarricade(cards) && hasBodySlam(cards) && p.block >= 4 && hasCorruption(cards) && (hasFeelNoPain(cards) || hasFiendFire(cards) || hasSecondWind(cards) || hasBattleDrum(cards))) return ['防御軸','廃棄軸'];
       if(hasCorruption(cards) && (hasFeelNoPain(cards) || hasFiendFire(cards) || hasSecondWind(cards) || hasBattleDrum(cards))) return ['廃棄循環軸'];
       if(p.weakCore >= 1) return ['弱体軸'];
       if(hasCorruption(cards) || p.exhaust >= 1) return ['廃棄軸'];
@@ -26326,61 +26666,100 @@ const SILENT_PHASE1_CARDS = [
 
     var fire=metric(result,'火力'), defense=metric(result,'防御'), draw=metric(result,'ドロー'), energy=metric(result,'エナジー'), scale=metric(result,'スケール'), accident=metric(result,'事故率');
     var energyLoad=num(result && result.energyLoadScore), brick=num(result && result.handBrickRate), avgDamage=num(result && result.avgDamage);
-    var seed=cards.length + p.special*3 + p.block*5 + p.strength*7 + p.exhaust*11 + p.lowAttacks*13;
+    var seed=stableDeckSeed(cards,'ironclad') || (cards.length + p.special*3 + p.block*5 + p.strength*7 + p.exhaust*11 + p.lowAttacks*13);
     var hasAoe = aoeCount(cards) > 0;
+    var completedNamePackage = (typeof completedPackageProfile === 'function') ? completedPackageProfile(cards) : null;
+    var hasEstablishedMainSupportForName = !!(completedNamePackage && completedNamePackage.complete && completedNamePackage.primary && completedNamePackage.supports && completedNamePackage.supports.length);
     var usableFire = fire || avgDamage*4;
     var usableDefense = defense || p.block*10;
+    var energyCards = count(cards,function(c){ return hasTag(c,'エナジー') || hasTag(c,'エナジー補助') || hasTag(c,'コスト軽減') || c.energyGain || c.energyNext || ['供物','激昂','seeing_red','offering'].indexOf(cleanName(c))>=0 || ['offering','seeing_red'].indexOf(c && c.id)>=0; });
+    var highCost = count(cards,function(c){ return c && (c.cost === 'X' || num(c.cost) >= 2 || hasTag(c,'高コスト') || hasTag(c,'大技')); });
+    function chooseIroncladCompoundName(){
+      if(hasBarricade(cards) && hasBodySlam(cards) && p.block >= 4){
+        var barricadeReady = usableDefense >= 55 && (scale >= 40 || draw >= 35 || p.block >= 6);
+        return {deckName:chooseDeckName(barricadeReady ? pool.bodySlam.concat(pool.barricadeEstablished) : pool.barricadeForming.concat(pool.bodySlam),seed), axes:axes};
+      }
+      if(hasCorruption(cards) && (hasFeelNoPain(cards) || hasFiendFire(cards) || hasSecondWind(cards) || hasBattleDrum(cards))){
+        var corruptionReady = p.exhaust >= 3 && (draw >= 45 || p.special >= 3 || hasBattleDrum(cards));
+        if(hasFiendFire(cards) && corruptionReady) return {deckName:chooseDeckName(pool.fiendFireEstablished.concat(pool.corruptionEstablished),seed), axes:axes};
+        if(hasFeelNoPain(cards) && corruptionReady) return {deckName:chooseDeckName(pool.exhaustFeelNoPain.concat(pool.corruptionEstablished),seed), axes:axes};
+        return {deckName:chooseDeckName(pool.corruptionForming.concat(hasFiendFire(cards) ? pool.fiendFireForming : []),seed), axes:axes};
+      }
+      if(hasFiendFire(cards) && p.exhaust >= 2){
+        return {deckName:chooseDeckName(p.exhaustPayoff >= 2 ? pool.fiendFireEstablished : pool.fiendFireForming,seed), axes:axes};
+      }
+      if(hasFeelNoPain(cards) && p.exhaust >= 2){
+        return {deckName:chooseDeckName(p.exhaustPayoff >= 2 ? pool.exhaustFeelNoPain : pool.exhaustWeak,seed), axes:axes};
+      }
+      if(hasDemonForm(cards) || (p.strength >= 1 && p.strengthPayoff >= 1)){
+        var strengthReady = (hasDemonForm(cards) || p.strength >= 2) && p.strengthPayoff >= 2 && usableDefense >= 42 && (draw >= 35 || scale >= 50);
+        if(strengthReady && p.strengthPayoff >= 2) return {deckName:chooseDeckName((draw < 35 ? pool.strengthMulti : pool.strengthMulti.concat(pool.strengthEstablished)),seed), axes:axes};
+      }
+      return null;
+    }
+    var criticalNameRisk = (brick >= 0.42 || accident >= 75 || energyLoad >= 88) && (draw < 35 || usableDefense < 35 || energy < 35 || energyLoad >= 88);
+    var compoundFirst = criticalNameRisk ? null : chooseIroncladCompoundName();
+    if(compoundFirst) return compoundFirst;
 
-    // 1. 致命的な弱点系を最優先。勝ち筋軸は oldAxisHints() のまま維持する。
+    // 1. 致命的な弱点系を最優先。完成名は出さない。
     if((brick >= 0.34 || accident >= 62 || energyLoad >= 78) && (draw < 45 || usableDefense < 45 || energy < 42 || energyLoad >= 78)){
-      var heavyNames = energyLoad >= 78 ? ['立ち上がりが重い','助走で転ぶデッキ'] : (usableDefense < 42 ? ['回る前に死ぬ','準備中に殴られる','動く前に燃える'] : ['助走で転ぶデッキ','遅れてくる本命']);
-      return {deckName:chooseDeckName(heavyNames,seed), axes:axes};
+      return {deckName:chooseDeckName(energyCards > highCost ? pool.energyWeak : pool.frontScaleWeak.concat(pool.longForming),seed), axes:axes};
     }
     if(usableDefense > 0 && usableDefense < 36 && (p.special >= 1 || p.strength || p.exhaust || hasPrimal(cards))){
-      return {deckName:chooseDeckName(['受け身が薄い','盾が足りない','守りが追いつかない','防御の穴だらけ'],seed), axes:axes};
+      return {deckName:chooseDeckName(pool.frontScaleWeak.concat(['殴る準備だけ万全']),seed), axes:axes};
     }
     if(usableFire > 0 && usableFire < 38 && (usableDefense >= 45 || p.block >= 3 || p.special >= 1)){
-      return {deckName:chooseDeckName(['削り切れない刃','火力待ち','押し切れない山','あと一押し足りない','長引くほど苦しい'],seed), axes:axes};
+      return {deckName:chooseDeckName(pool.defenseWeak.concat(pool.longForming),seed), axes:axes};
     }
     if((scale > 0 && scale < 38) && (usableDefense >= 58 || p.block >= 5) && usableFire < 55){
-      return {deckName:'泥沼の戦い', axes:axes};
+      return {deckName:chooseDeckName(pool.longForming.concat(pool.defenseWeak),seed), axes:axes};
     }
-    if(!hasAoe && cards.length >= 11 && usableFire >= 48 && usableDefense >= 42){
-      return {deckName:chooseDeckName(['横並びが怖い','一体ずつしか倒せない','群れに弱いデッキ','まとめて倒せない'],seed), axes:axes};
+    // AoE不足だけをデッキ名の主役にしない。成立前なら接続不足名へ寄せる。
+    if(!hasEstablishedMainSupportForName && !hasAoe && cards.length >= 11 && usableFire >= 48 && usableDefense >= 42){
+      if(p.special >= 3 && p.connectors <= 1) return {deckName:chooseDeckName(pool.scatter,seed), axes:axes};
     }
 
-    // 2. 明確な主軸系。完成条件が弱い場合は「芽・準備・待ち・入口」に寄せる。
-    if(p.weakCore >= 1 && !(hasCorruption(cards) && (hasFeelNoPain(cards) || hasFiendFire(cards) || hasSecondWind(cards) || hasBattleDrum(cards)))){
-      var weakReady = hasMerciless(cards) && (usableDefense >= 42 || p.block >= 3 || p.weakDefensePayoff >= 1) && (draw >= 35 || p.weakPayoff >= 2 || (p.weakDrawPayoff && p.weakChain));
-      var weakNames = ['威圧の構え','弱らせて耐える','被弾を削る戦い','弱体で支えるデッキ','弱体ロック準備'];
-      if(p.weakDefensePayoff >= 1 && !hasMerciless(cards)) weakNames = ['弱らせて受ける','巨人の構え','被弾半減プラン','弱体防御デッキ'];
-      if(hasMerciless(cards)) weakNames = weakReady ? ['弱体で狩る','威圧と無慈悲','弱らせて仕留める','弱体突破デッキ','無慈悲な威圧'] : ['弱らせて仕留める準備','無慈悲待ちの威圧','弱体突破準備'];
-      if(hasMerciless(cards) && p.weakDefensePayoff >= 1 && weakReady) weakNames = ['弱体で狩る','威圧と無慈悲','弱らせて仕留める','被弾半減プラン','無慈悲な威圧'];
-      return {deckName:chooseDeckName(weakNames,seed), axes:axes};
+    // 2. 主軸＋補助軸が成立している複合プール。
+    if(hasBarricade(cards) && hasBodySlam(cards) && p.block >= 4){
+      var barricadeReady = usableDefense >= 55 && (scale >= 40 || draw >= 35 || p.block >= 6);
+      return {deckName:chooseDeckName(barricadeReady ? pool.bodySlam.concat(pool.barricadeEstablished) : pool.barricadeForming.concat(pool.bodySlam),seed), axes:axes};
     }
     if(hasCorruption(cards) && (hasFeelNoPain(cards) || hasFiendFire(cards) || hasSecondWind(cards) || hasBattleDrum(cards))){
-      var exhaustReady = (hasFeelNoPain(cards) || hasFiendFire(cards)) && p.exhaust >= 3 && (draw >= 45 || p.special >= 3);
-      return {deckName:exhaustReady ? chooseDeckName(['燃やして回る','廃棄エンジン','燃えるほど強い'],seed) : chooseDeckName(['燃やす準備','廃棄の入口','燃料待ち','削って回すデッキ'],seed), axes:axes};
+      var corruptionReady = p.exhaust >= 3 && (draw >= 45 || p.special >= 3 || hasBattleDrum(cards));
+      if(hasFiendFire(cards) && corruptionReady) return {deckName:chooseDeckName(pool.fiendFireEstablished.concat(pool.corruptionEstablished),seed), axes:axes};
+      if(hasFeelNoPain(cards) && corruptionReady) return {deckName:chooseDeckName(pool.exhaustFeelNoPain.concat(pool.corruptionEstablished),seed), axes:axes};
+      return {deckName:chooseDeckName(pool.corruptionForming.concat(hasFiendFire(cards) ? pool.fiendFireForming : []),seed), axes:axes};
     }
-    if(hasCorruption(cards) || p.exhaust >= 1){
-      return {deckName:chooseDeckName(['燃やす準備','捨てて強くなる','燃料待ち','廃棄の入口','燃える山札'],seed), axes:axes};
+    if(hasFiendFire(cards) && p.exhaust >= 2){
+      return {deckName:chooseDeckName(p.exhaustPayoff >= 2 ? pool.fiendFireEstablished : pool.fiendFireForming,seed), axes:axes};
     }
-    if(hasBarricade(cards) && (hasBodySlam(cards) || p.block >= 3)){
-      var blockReady = hasBodySlam(cards) && p.block >= 4 && usableDefense >= 55 && scale >= 40;
-      return {deckName:blockReady ? chooseDeckName(['鉄壁の構え','守れば勝つ','盾で殴る','崩れない山'],seed) : chooseDeckName(['守って殴る準備','盾の芽','受けて返すデッキ','固める途中','守りの形が見える'],seed), axes:axes};
-    }
-    if(hasPrimal(cards) && p.lowAttacks >= 1){
-      var conversionReady = p.lowAttacks >= 3 && usableDefense >= 42 && (draw >= 40 || energy >= 40);
-      return {deckName:conversionReady ? chooseDeckName(['石で押し切る','岩のデッキ','変換エンジン','石化完成形'],seed) : chooseDeckName(['石に変える準備','岩になりたいデッキ','変換待ち','石化の入口','山札を石に寄せる'],seed), axes:axes};
+    if(hasFeelNoPain(cards) && p.exhaust >= 2){
+      return {deckName:chooseDeckName(p.exhaustPayoff >= 2 ? pool.exhaustFeelNoPain : pool.exhaustWeak,seed), axes:axes};
     }
     if(hasDemonForm(cards) || (p.strength >= 1 && p.strengthPayoff >= 1)){
       var strengthReady = (hasDemonForm(cards) || p.strength >= 2) && p.strengthPayoff >= 2 && usableDefense >= 42 && (draw >= 35 || scale >= 50);
-      return {deckName:strengthReady ? chooseDeckName(['筋肉で解決','力で押し切るデッキ','育った腕力','殴れば勝つ'],seed) : chooseDeckName(['筋肉の芽','力こそ準備中','まだ細い筋肉','筋肉待ち','力で押す準備'],seed), axes:axes};
+      if(strengthReady && p.strengthPayoff >= 2) return {deckName:chooseDeckName((draw < 35 ? pool.strengthMulti : pool.strengthMulti.concat(pool.strengthEstablished)),seed), axes:axes};
+      return {deckName:chooseDeckName(pool.strengthWeak,seed), axes:axes};
     }
-    if(p.strength >= 1) return {deckName:chooseDeckName(['筋肉の芽','筋肉待ち','殴る理由は見えている','力で押す準備'],seed), axes:axes};
-    if(p.block >= 5 || hasBarricade(cards) || hasBodySlam(cards)) return {deckName:(scale > 0 && scale < 45 ? '泥沼の戦い' : chooseDeckName(['守って殴る準備','盾の芽','固める途中','守りの形が見える'],seed)), axes:axes};
-    if(p.special >= 4) return {deckName:'不完全燃焼', axes:axes};
-    if(avgDamage >= 18) return {deckName:chooseDeckName(['突破準備','火力準備中','殴る手段は見えている'],seed), axes:axes};
+
+    // 3. 単一軸成立/形成中。
+    if(hasCorruption(cards) || p.exhaust >= 1){
+      if(p.exhaust >= 3 && p.exhaustPayoff >= 2) return {deckName:chooseDeckName(pool.exhaustEstablished,seed), axes:axes};
+      return {deckName:chooseDeckName(pool.exhaustWeak.concat(pool.exhaustEstablished.slice(0,2)),seed), axes:axes};
+    }
+    if(hasBarricade(cards) && p.block >= 4){
+      return {deckName:chooseDeckName((usableDefense >= 55 && scale >= 40) ? pool.barricadeEstablished : pool.barricadeForming,seed), axes:axes};
+    }
+    if(p.block >= 5 || hasBarricade(cards) || hasBodySlam(cards)){
+      return {deckName:chooseDeckName((usableFire > 0 && usableFire < 45) ? pool.defenseWeak : pool.defenseEstablished,seed), axes:axes};
+    }
+    if(energyCards >= 2){
+      return {deckName:chooseDeckName(highCost >= 2 ? pool.energyEstablished : pool.energyWeak,seed), axes:axes};
+    }
+    if(p.strength >= 1) return {deckName:chooseDeckName(pool.strengthWeak,seed), axes:axes};
+    if(hasDemonForm(cards) || (scale >= 55 && usableDefense >= 45)) return {deckName:chooseDeckName(pool.longEstablished,seed), axes:axes};
+    if(p.special >= 4) return {deckName:chooseDeckName(pool.scatter,seed), axes:axes};
+    if(avgDamage >= 18 || usableFire >= 55) return {deckName:chooseDeckName((scale > 0 && scale < 45) ? pool.frontScaleWeak : pool.frontEstablished,seed), axes:axes};
     if(cards.length <= 13) return {deckName:chooseDeckName(['ただの山札','迷子のデッキ','方向待ち','これから決めるデッキ'],seed), axes:axes};
     return {deckName:deckName, axes:axes};
   }
@@ -26433,7 +26812,7 @@ const SILENT_PHASE1_CARDS = [
     if(/undefined|null|\[object Object\]/.test(n)) return true;
     if(/まだ何者でもない|石に変える準備|回る前に死にやすい|方向性は見えています|総合診断/.test(n)) return true;
     if(/威圧の構え|弱らせて耐える|被弾を削る戦い|弱体で支えるデッキ|弱体ロック準備|弱体で狩る|威圧と無慈悲|弱らせて仕留める|弱体突破デッキ|無慈悲な威圧|弱らせて受ける|巨人の構え|被弾半減プラン|弱体防御デッキ|弱らせて仕留める準備|無慈悲待ちの威圧|弱体突破準備/.test(n)) return true;
-    if(['岩を握る手札','変わり始めた攻撃札','静かな循環','堕落形成中','崩れない壁','長期戦志向','不完全燃焼','噛み合い不足','形成前','突破準備','突破準備型','力の火種','筋力長期戦','筋力形成中','ブロック形成中','廃棄形成中','均衡調整型','方向模索中','準備中の刃','刃が回り始める','毒スケール形成中','回り始めた毒','循環準備型','守備反撃型','守備準備型','速攻突破型','長期戦型','軽量混成','未完成サイレント','ただの山札','迷子のデッキ','方向待ち','種も仕掛けもない','これから決めるデッキ','回る前に死ぬ','準備中に殴られる','動く前に燃える','遅れてくる本命','立ち上がりが重い','助走で転ぶデッキ','削り切れない刃','火力待ち','押し切れない山','あと一押し足りない','殴る手段が足りない','長引くほど苦しい','受け身が薄い','殴られる準備だけできている','盾が足りない','守りが追いつかない','危ない受け身','防御の穴だらけ','伸びないまま戦う','長期戦で息切れ','泥沼の戦い','ボスで止まるデッキ','育つ前に終わる','後半の刃が鈍い','横並びが怖い','一体ずつしか倒せない','群れに弱いデッキ','複数戦で崩れる','まとめて倒せない','横に広がる敵が苦手','筋肉の芽','力こそ準備中','まだ細い筋肉','筋肉待ち','殴る理由は見えている','力で押す準備','筋肉で解決','力で押し切るデッキ','育った腕力','殴れば勝つ','燃やす準備','捨てて強くなる','燃料待ち','廃棄の入口','燃える山札','削って回すデッキ','燃やして回る','廃棄エンジン','燃えるほど強い','山札を削る力','守って殴る準備','盾の芽','受けて返すデッキ','固める途中','守りの形が見える','鉄壁の構え','守れば勝つ','盾で殴る','崩れない山','岩になりたいデッキ','変換待ち','石化の入口','山札を石に寄せる','石で押し切る','岩のデッキ','変換エンジン','石化完成形','毒の芽','毒で削る準備','じわじわ倒すデッキ','毒待ち','時間を味方にする毒','毒で沈める','毒殺プラン','長期毒デッキ','触媒待ちの毒','ナイフの芽','刃を並べる準備','手数で押す準備','ナイフ待ち','小さな刃の群れ','ナイフで刻む','刃の嵐','手数で削る','ナイフ完成形','スライの入口','回す準備','手札を動かすデッキ','捨てて得する準備','循環待ち','スライで回る','手札循環デッキ','捨てて進む','回転する山札','軽量循環未完成','まだ細い循環','防御先行コントロール','火力準備中','崩れやすい毒','初動不安定ナイフ'].indexOf(n) >= 0) return true;
+    if(['岩を握る手札','変わり始めた攻撃札','静かな循環','堕落形成中','崩れない壁','長期戦志向','不完全燃焼','噛み合い不足','形成前','突破準備','突破準備型','力の火種','筋力長期戦','筋力形成中','ブロック形成中','廃棄形成中','均衡調整型','方向模索中','準備中の刃','刃が回り始める','毒スケール形成中','回り始めた毒','循環準備型','守備反撃型','守備準備型','速攻突破型','長期戦型','軽量混成','未完成サイレント','ただの山札','迷子のデッキ','方向待ち','種も仕掛けもない','これから決めるデッキ','回る前に死ぬ','準備中に殴られる','動く前に燃える','遅れてくる本命','立ち上がりが重い','助走で転ぶデッキ','削り切れない刃','火力待ち','押し切れない山','あと一押し足りない','殴る手段が足りない','長引くほど苦しい','受け身が薄い','殴られる準備だけできている','盾が足りない','守りが追いつかない','危ない受け身','防御の穴だらけ','伸びないまま戦う','長期戦で息切れ','泥沼の戦い','ボスで止まるデッキ','育つ前に終わる','後半の刃が鈍い','横並びが怖い','一体ずつしか倒せない','群れに弱いデッキ','複数戦で崩れる','まとめて倒せない','横に広がる敵が苦手','筋肉の芽','力こそ準備中','まだ細い筋肉','筋肉待ち','殴る理由は見えている','力で押す準備','筋肉で解決','力で押し切るデッキ','育った腕力','殴れば勝つ','燃やす準備','廃棄で強くなる','燃料待ち','廃棄の入口','燃える山札','削って回すデッキ','燃やして回る','廃棄エンジン','燃えるほど強い','山札を削る力','守って殴る準備','盾の芽','受けて返すデッキ','固める途中','守りの形が見える','鉄壁の構え','守れば勝つ','盾で殴る','崩れない山','岩になりたいデッキ','変換待ち','石化の入口','山札を石に寄せる','石で押し切る','岩のデッキ','変換エンジン','石化完成形','毒の芽','毒で削る準備','じわじわ倒すデッキ','毒待ち','時間を味方にする毒','毒で沈める','毒殺プラン','長期毒デッキ','触媒待ちの毒','ナイフの芽','刃を並べる準備','手数で押す準備','ナイフ待ち','小さな刃の群れ','ナイフで刻む','刃の嵐','手数で削る','ナイフ完成形','スライの入口','回す準備','手札を動かすデッキ','スライで得する準備','循環待ち','スライで回る','手札循環デッキ','スライで進む','回転する山札','軽量循環未完成','まだ細い循環','防御先行コントロール','火力準備中','崩れやすい毒','初動不安定ナイフ'].indexOf(n) >= 0) return true;
     if(!/軸$/.test(n) && /(芽|準備|待ち|入口|未完成|不安定|細い|泥沼|山札|デッキ|怖い|弱い|崩れる|足りない|薄い|重い|転ぶ|殴られる|燃える|押し切れない|削り切れない|息切れ|鈍い|完成形|プラン|嵐|刻む|沈める)/.test(n)) return true;
     if(/デッキです|デッキ|構成です|状態です|不足しています|確認してください/.test(n)) return true;
     return false;
@@ -26533,8 +26912,142 @@ const SILENT_PHASE1_CARDS = [
     }
     return out;
   }
+  function completedPackageProfile(cards){
+    var isSilentDeck = isSilent(cards) && !isIronclad(cards);
+    var isIronDeck = isIronclad(cards) && !isSilentDeck;
+    var has = function(names){ return hasName(cards,names); };
+    var countNames = function(names){ return count(cards,function(c){ return hasName([c], names); }); };
+    var blockCount = count(cards,isBlock);
+    var drawCount = count(cards,function(c){ return num(c.draw)>0 || num(c.drawNext)>0 || hasTag(c,'ドロー') || hasTag(c,'回転') || ['供物','ポンメルストライク','アドレナリン','アクロバット','バックフリップ'].indexOf(cleanName(c))>=0; });
+    var exhaustCount = count(cards,function(c){ return hasTag(c,'廃棄') || ['堕落','無痛','鬼火','セカンドウィンド','戦いのドラム'].indexOf(cleanName(c))>=0 || ['corruption','feel_no_pain','fiend_fire','second_wind','battle_drum'].indexOf(c && c.id)>=0; });
+    var ironExhaust = isIronDeck && has(['堕落','corruption']) && has(['無痛','feel_no_pain']) && (has(['セカンドウィンド','second_wind']) || has(['鬼火','fiend_fire']) || has(['戦いのドラム','battle_drum']) || exhaustCount >= 4);
+    var ironBlock = isIronDeck && has(['バリケード','barricade']) && has(['ボディスラム','body_slam']) && (blockCount >= 5 || has(['不動','impervious']) || has(['ジャガーノート','juggernaut']));
+    var ironStrength = isIronDeck && has(['悪魔化','demon_form']) && (has(['発火','inflame']) || has(['リミットブレイク','limit_break'])) && (has(['ツインストライク','twin_strike']) || has(['死神','reaper']));
+    var shivGen = isSilentDeck ? countNames(['剣の舞','外套と短剣','silent_blade_dance','silent_cloak_and_dagger']) : 0;
+    var shivPayoff = isSilentDeck ? countNames(['精度上昇','とどめの一撃','残像','silent_accuracy','silent_finisher','silent_after_image']) : 0;
+    var silentSupport = isSilentDeck ? countNames(['アドレナリン','アクロバット','バックフリップ','フットワーク','ブラー','足払い','金切り声','残像','silent_adrenaline','silent_acrobatics','silent_backflip','silent_footwork','silent_blur','silent_leg_sweep','silent_piercing_wail','silent_after_image']) : 0;
+    var silentKnife = isSilentDeck && shivGen >= 2 && shivPayoff >= 2 && silentSupport >= 4;
+    var primary = '';
+    var supports = [];
+    if(ironBlock){ primary = '防御軸'; supports.push('廃棄軸'); }
+    else if(ironExhaust){ primary = '廃棄軸'; supports.push('防御軸'); }
+    else if(ironStrength){ primary = '筋力軸'; supports.push('防御軸'); }
+    else if(silentKnife){ primary = 'ナイフ軸'; supports.push('防御継続'); }
+    var complete = ironExhaust || ironBlock || ironStrength || silentKnife;
+    if(ironExhaust && primary !== '廃棄軸' && supports.indexOf('廃棄軸') < 0) supports.push('廃棄軸');
+    if(ironBlock && primary !== '防御軸' && supports.indexOf('防御軸') < 0) supports.push('防御軸');
+    if(ironStrength && primary !== '筋力軸' && supports.indexOf('筋力軸') < 0) supports.push('筋力軸');
+    return {complete:complete, ironExhaust:ironExhaust, ironBlock:ironBlock, ironStrength:ironStrength, silentKnife:silentKnife, primary:primary, supports:supports.slice(0,3), drawCount:drawCount, blockCount:blockCount};
+  }
+  function packageAxisObject(name, score, summary, tags){
+    var st = typeof winConditionState === 'function' ? winConditionState(score) : {rank:'A',stage:'成立',label:'A（成立）',cls:'ok'};
+    return {key:name, name:name, title:name, axis:name, score:score, state:st, stage:st, summary:summary, reason:summary, needs:tags || ['大きな不足なし'], tags:tags || ['大きな不足なし']};
+  }
+  function applyCompletedPackageRecognition(result, cards){
+    if(!result) return result;
+    var pkg = completedPackageProfile(cards);
+    if(!pkg.complete) return result;
+    var primary = pkg.primary || '勝ち筋';
+    var summary = pkg.silentKnife
+      ? 'ナイフ生成・強化・手数・防御継続がつながっており、ナイフ軸はクリア圏内の主軸として成立しています。'
+      : pkg.ironBlock
+        ? 'バリケード・ボディスラム・高防御札がつながっており、防御から火力へ変換する勝ち筋が成立しています。'
+        : pkg.ironExhaust
+          ? '堕落・無痛・廃棄札がつながっており、廃棄による循環と防御変換が成立しています。'
+          : '筋力供給と決定打がつながっており、長期戦の火力軸として成立しています。';
+    var mainAxis = packageAxisObject(primary, pkg.silentKnife ? 88 : 90, summary, pkg.silentKnife ? ['ナイフ','手数','防御継続'] : ['成立','変換','継戦能力']);
+    var supports = pkg.supports.filter(function(x){ return x && x !== primary; }).map(function(name){
+      var text = name === '廃棄軸' ? '廃棄札が防御・循環の支えとして機能しています。' : name === '防御軸' || name === '防御継続' ? '防御札と継戦補助が勝ち筋を支えています。' : '補助火力として主軸を支えています。';
+      return packageAxisObject(name, 76, text, ['補助','接続済み']);
+    });
+    var axes = [mainAxis].concat(supports);
+    result.characterWinValidation = Object.assign({}, result.characterWinValidation || {}, {
+      character: pkg.silentKnife ? 'silent' : 'ironclad',
+      axes: axes,
+      winConditionAxes: axes,
+      mainAxis: mainAxis,
+      supportAxes: supports,
+      state: mainAxis.state,
+      completion: Math.max(num(result.characterWinValidation && result.characterWinValidation.completion), mainAxis.score),
+      conclusion: '主軸：' + primary + ' ' + mainAxis.state.label + '。' + (supports.length ? ' 補助：' + supports.map(function(a){ return a.name + ' ' + a.state.label; }).join(' / ') + '。' : '') + '完成パッケージとして接続しているため、警告よりも事故率とプレイ判断を確認する段階です。'
+    });
+    result.winConditionAxes = axes.map(function(a){ return a.name; });
+    result.winCondition = Object.assign({}, result.winCondition || {}, {
+      name: primary,
+      title: primary,
+      mainAxis: primary,
+      mainAxisName: primary,
+      subAxes: supports.map(function(a){ return a.name; }),
+      mixedName: [primary].concat(supports.map(function(a){ return a.name; })).join('＋'),
+      completion: Math.max(num(result.winCondition && result.winCondition.completion), mainAxis.score),
+      state: mainAxis.state,
+      reasons: [summary]
+    });
+    result.diagnosis = Object.assign({}, result.diagnosis || {});
+    result.diagnosis.name = result.diagnosis.name || primary;
+    result.clearCapablePackage = Object.assign({}, pkg, {summary:summary});
+    return result;
+  }
   function finalizeWinConditionSeparation(result, cards){
     if(!result) return result;
+    var isRegentDeck = arr(cards).some(function(c){ return c && c.character === 'regent'; });
+    var isRegentResult = result.character === 'regent' || result.hero === 'regent' || (result.characterWinValidation && result.characterWinValidation.character === 'regent') || (result.characterAnalysis && result.characterAnalysis.character === 'regent');
+    if(isRegentDeck || isRegentResult){
+      result.character = 'regent';
+      result.hero = 'regent';
+      var regentValidation = null;
+      try{
+        if(typeof analyzeRegentEconomyValidation === 'function'){
+          regentValidation = analyzeRegentEconomyValidation(cards, {
+            avgDamage: result.avgDamage,
+            avgBlock: result.avgBlock,
+            avgPlayCount: result.avgPlayCount,
+            actionShortageRate: result.actionShortageRate,
+            energyLoadScore: result.energyLoadScore,
+            deckRotationScore: result.deckRotationScore,
+            longScalingScore: result.longScalingScore,
+            aoe: result.aoe,
+            compressionRate: result.compressionRate
+          });
+        }
+      }catch(e){ regentValidation = null; }
+      if(regentValidation){
+        result.characterWinValidation = regentValidation;
+        result.regentEconomy = regentValidation.regentEconomy;
+      }else{
+        result.characterWinValidation = Object.assign({}, result.characterWinValidation || {}, {
+          character:'regent',
+          conclusion:'リージェントは軸名ではなく、メイン経済・経済停滞・補助到達で確認します。',
+          axes:[
+            {key:'mainEconomy', name:'メイン経済', score:0, summary:'リージェント経済の主変換を確認します。'},
+            {key:'bottleneck', name:'経済停滞', score:0, summary:'生成・変換が止まっている箇所を確認します。'},
+            {key:'supportReach', name:'補助・到達状況', score:0, summary:'セットアップ・無色生成・ミニオン・到達速度を確認します。'}
+          ],
+          mainAxis:{name:'メイン経済', score:0, summary:'リージェント経済の主変換を確認します。'},
+          regentEconomy:{mainEconomies:[], bottlenecks:[], support:[]}
+        });
+      }
+      result.winConditionAxes = [];
+      result.winCondition = Object.assign({}, result.winCondition || {}, {
+        name:'リージェント経済分析',
+        title:'リージェント経済分析',
+        mainAxis:'リージェント経済分析',
+        mainAxisName:'リージェント経済分析',
+        subAxes:[],
+        mixedName:'',
+        deckName:(result.diagnosis && result.diagnosis.name) || result.deckName || '',
+        displayName:(result.diagnosis && result.diagnosis.name) || result.deckName || '',
+        reasons:['リージェントはメイン経済・経済停滞・補助到達で確認します。']
+      });
+      if(result.commonAxisEvaluation){
+        result.commonAxisEvaluation = Object.assign({}, result.commonAxisEvaluation, {
+          mainAxis:'リージェント経済分析',
+          winConditionAxes:[],
+          deckName:(result.diagnosis && result.diagnosis.name) || result.deckName || ''
+        });
+      }
+      return result;
+    }
     var starterLike = false;
     try{ starterLike = !!result.starterLikeDeck || (typeof isStarterLikeDeckForDisplay === 'function' && isStarterLikeDeckForDisplay({cards:cards})); }catch(e){ starterLike = false; }
     var axes = starterLike ? [] : collectSeparatedAxes(result, cards);
@@ -26574,7 +27087,7 @@ const SILENT_PHASE1_CARDS = [
         conclusion: conclusion || (primary === '主軸未確定' ? 'まだ明確な勝ち筋は成立していません。勝ち筋カードと、それを支える補助性能を分けて確認してください。' : primary + 'の成立度を確認します。')
       });
     }
-    return result;
+    return applyCompletedPackageRecognition(result, cards);
   }
   function applySeparation(result,cards){
     if(!result || !isIronclad(cards) || isSilent(cards)) return result;
@@ -27069,6 +27582,128 @@ const SILENT_PHASE1_CARDS = [
 }
 
 
+
+/* impl145: first-view win card spacing adjustment
+   勝ち筋カード内の軸名と説明文の横余白を詰め、説明を自然に近づける */
+.firstViewWinCard{
+  grid-template-columns:max-content minmax(0,1fr) !important;
+  gap:6px 10px !important;
+  align-items:center !important;
+}
+.firstViewWinCard .firstViewWinTop{
+  width:max-content !important;
+  max-width:170px !important;
+}
+.firstViewWinCard .firstViewWinSummary{
+  align-self:center !important;
+}
+@media(max-width:760px){
+  .firstViewWinCard{
+    grid-template-columns:1fr !important;
+  }
+  .firstViewWinCard .firstViewWinTop{
+    width:auto !important;
+    max-width:none !important;
+  }
+}
+
+
+
+/* impl146: axis current comments render fix */
+.supportCommentRow{
+  display:block !important;
+  height:auto !important;
+  max-height:none !important;
+  overflow:visible !important;
+}
+.supportCommentRow .supportLabel,
+.supportCommentRow .supportValue{
+  display:inline-block !important;
+  margin-right:8px !important;
+  vertical-align:top !important;
+}
+.supportCommentRow .winAxisDescription,
+.supportCommentRow .winAxisCurrent{
+  margin-top:7px !important;
+}
+@media(max-width:760px){
+  }
+
+
+/* impl148: ensure current comments stay visible after production render */
+#view-diagnosis .winAxisDescription,
+#view-diagnosis .winAxisCurrent,
+#view-diagnosis .winStructureNote{
+  display:block !important;
+  height:auto !important;
+  max-height:none !important;
+  overflow:visible !important;
+  overflow-y:visible !important;
+}
+#view-diagnosis .winAxisCurrent{
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+
+/* impl150: first-view win card compact title/status layout */
+.firstViewWinCard{
+  display:block !important;
+  grid-template-columns:none !important;
+  gap:0 !important;
+  align-items:stretch !important;
+}
+.firstViewWinCard .firstViewWinTop{
+  display:grid !important;
+  grid-template-columns:max-content minmax(0,1fr) !important;
+  gap:8px 12px !important;
+  align-items:start !important;
+  width:100% !important;
+  max-width:none !important;
+  margin:0 !important;
+}
+.firstViewWinMeta{
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:flex-start !important;
+  justify-content:flex-start !important;
+  gap:4px !important;
+  min-width:max-content !important;
+}
+.firstViewWinBody{
+  min-width:0 !important;
+}
+.firstViewWinRole{
+  margin:0 !important;
+}
+.firstViewWinStatus{
+  width:max-content !important;
+  margin:0 !important;
+}
+.firstViewWinCard .firstViewWinName{
+  margin:1px 0 3px !important;
+}
+.firstViewWinCard .firstViewWinSummary{
+  margin:0 !important;
+  align-self:auto !important;
+}
+.firstViewWinCard .firstViewWinTags{
+  grid-column:auto !important;
+  margin-top:6px !important;
+}
+@media(max-width:420px){
+  .firstViewWinCard .firstViewWinTop{
+    grid-template-columns:1fr !important;
+    gap:6px !important;
+  }
+  .firstViewWinMeta{
+    flex-direction:row !important;
+    flex-wrap:wrap !important;
+    align-items:center !important;
+  }
+}
+
 /* impl101: reduce sticky sidebar top gap, make loss severity a readable tag, rename need panel only */
 @media(min-width:1181px){
   .impl4DiagnosisSidebar{
@@ -27305,5 +27940,200 @@ const SILENT_PHASE1_CARDS = [
   }
 }
 </style>
+
+<script>
+/* impl173_silent_rank_fatal_cleanup_v1
+   診断・ランク・1st表示に関係する旧経路を整理する。
+   - 最終ランク/クリア圏内ラベルは selected Act の確定スコアから一元決定する。
+   - 1stビュー/上部診断は final overallRank / isClearCapable / diagnosis.label を参照するだけに寄せる。
+   - AoE不足・浮き札・支援不足・Act2横並び注意・軽い初動不安は注意として残すが、A/S降格理由にしない。
+   - 旧clearCapable再判定は final結果を優先し、古い上部summary文から致命不足を逆算しない。
+   CSS/HTML構造/カードDB/analyzeDeck本体/renderAnalysis本体の大規模変更はしない。 */
+(function(){
+  function arr(v){ return Array.isArray(v) ? v : []; }
+  function str(v){ return String(v == null ? '' : v); }
+  function clean(v){ return str(v).replace(/\s+/g,' ').trim(); }
+  function num(v){ v = Number(v); return Number.isFinite(v) ? v : 0; }
+  function clampScore(v){ return Math.max(0, Math.min(100, Math.round(num(v)))); }
+  function normalizeText(v){
+    return clean(v)
+      .replace(/総合診断：\s*/g,'')
+      .replace(/クリア圏内候補/g,'クリア圏内')
+      .replace(/序盤火力が薄くです/g,'序盤火力が薄い場合は成立前に押し切られやすいです')
+      .replace(/薄くです/g,'薄いです')
+      .replace(/部品はありますが、接続がまだ不足しています。/g,'パーツはありますが、接続がまだ不足しています。')
+      .replace(/全体攻撃性能/g,'AoE性能');
+  }
+  function detectActKey(result){
+    var ae = (result && result.actEvaluation) || {};
+    var raw = String(ae.act || ae.label || ae.name || (typeof currentAct !== 'undefined' ? currentAct : window.currentAct || '') || '').toLowerCase();
+    if(/3/.test(raw)) return 'act3';
+    if(/2/.test(raw)) return 'act2';
+    return 'act1';
+  }
+  function rankFromScore(score, actKey){
+    score = clampScore(score);
+    var act = String(actKey || '').toLowerCase();
+    var aLine = act === 'act1' ? 70 : (act === 'act2' ? 75 : (act === 'act3' ? 78 : 75));
+    if(score >= 85) return {rank:'S', text:'かなり強い', className:'rankS'};
+    if(score >= aLine) return {rank:'A', text:'安定して強い', className:'rankA'};
+    if(score >= 60) return {rank:'B', text:'平均以上', className:'rankB'};
+    if(score >= 45) return {rank:'C', text:'不安あり', className:'rankC'};
+    return {rank:'D', text:'かなり危険', className:'rankD'};
+  }
+  function cardName(c){
+    if(!c) return '';
+    if(typeof c === 'string') return c;
+    return clean(c.nameJa || c.name || c.displayName || c.id || c.cardId || c.nameEn || '');
+  }
+  function collectCards(result, deckList){
+    var src = [];
+    if(deckList && deckList.length) src = deckList;
+    else if(result){
+      src = arr(result.cards).concat(arr(result.deck), arr(result.deckList), arr(result.cardList));
+      if(result.currentDeck) src = src.concat(arr(result.currentDeck));
+    }
+    return src.filter(Boolean);
+  }
+  function deckText(cards){ return cards.map(cardName).join(' / '); }
+  function countName(cards, patterns){
+    return cards.reduce(function(sum,c){
+      var n = cardName(c);
+      return sum + (patterns.some(function(p){ return p.test(n); }) ? 1 : 0);
+    },0);
+  }
+  function hasName(cards, patterns){ return countName(cards, patterns) > 0; }
+  function isSilentDeck(result, cards){
+    var ch = clean((result && (result.character || result.hero || result.currentCharacter || result.currentHero)) || '').toLowerCase();
+    if(ch.indexOf('silent') >= 0 || ch.indexOf('サイレント') >= 0) return true;
+    var t = deckText(cards);
+    return /剣の舞|外套と短剣|精度上昇|とどめの一撃|残像|致死毒|有毒ガス|触媒|腐食の波|アクロバット|バックフリップ|フットワーク|ブラー|足払い|金切り声|無力化|サバイバー|ダガースロー|計算された賭け|反射|策士|腹裂き/.test(t);
+  }
+  function silentPackage(cards){
+    var knifeGen = countName(cards,[/剣の舞/,/外套と短剣/,/blade_dance/,/cloak_and_dagger/]);
+    var knifePay = countName(cards,[/精度上昇/,/とどめの一撃/,/残像/,/accuracy/,/finisher/,/after_image/]);
+    var poison = countName(cards,[/致死毒/,/有毒ガス/,/バウンドフラスコ/,/毒の一刺し/,/腐食の波/,/deadly_poison/,/noxious/,/bouncing_flask/]);
+    var poisonPay = countName(cards,[/触媒/,/促進剤/,/死体爆破/,/catalyst/,/corpse_explosion/]);
+    var defense = countName(cards,[/足払い/,/金切り声/,/フットワーク/,/ブラー/,/バックフリップ/,/残像/,/ディフレクト/,/防御/,/サバイバー/,/leg_sweep/,/piercing_wail/,/footwork/,/blur/,/backflip/,/after_image/]);
+    var draw = countName(cards,[/アドレナリン/,/アクロバット/,/バックフリップ/,/計算された賭け/,/準備/,/ダガースロー/,/adrenaline/,/acrobatics/,/backflip/,/calculated_gamble/,/prepared/,/dagger_throw/]);
+    var slash = countName(cards,[/ダガースロー/,/アクロバット/,/計算された賭け/,/反射/,/策士/,/腹裂き/,/準備/,/スライ/,/discard/,/reflex/,/tactician/,/eviscerate/]);
+    var aoe = hasName(cards,[/ダガースプレー/,/全力攻撃/,/死体爆破/,/腐食の波/,/AoE/,/dagger_spray/,/all_out_attack/,/corpse_explosion/]);
+    return {
+      knifeCore: knifeGen >= 2 && knifePay >= 1,
+      poisonCore: poison >= 2 && (poisonPay >= 1 || defense >= 3),
+      defenseCore: defense >= 4,
+      drawCore: draw >= 3,
+      slashCore: slash >= 4,
+      aoe: aoe,
+      act1Ready: ((knifeGen >= 2 && knifePay >= 1) || slash >= 4 || (poison >= 2 && defense >= 3)) && draw >= 2,
+      act2Ready: defense >= 4 && draw >= 2 && (knifeGen >= 2 || poison >= 2 || slash >= 4 || aoe),
+      act3Ready: defense >= 4 && draw >= 3 && ((knifeGen >= 2 && knifePay >= 1) || (poison >= 2 && (poisonPay >= 1 || defense >= 4)) || slash >= 4)
+    };
+  }
+  function axisEstablished(result){
+    var wc = (result && result.winCondition) || {};
+    var v = (result && (result.characterWinValidation || result.silentWinValidation || result.characterAnalysis)) || {};
+    var axes = [].concat(arr(wc.axes), arr(wc.rows), arr(wc.silentAxes), arr(v.axes), arr(v.winConditionAxes), arr(v.majorAxisCheck));
+    if(result && result.impl162CompletePackage && result.impl162CompletePackage.complete) return true;
+    if(result && result.clearCapablePackage && result.clearCapablePackage.complete) return true;
+    return axes.some(function(axis){
+      var tx = [axis && axis.name, axis && axis.title, axis && axis.label, axis && axis.status, axis && axis.stage, axis && axis.rank, axis && axis.state && (axis.state.label || axis.state.rank || axis.state.stage)].map(str).join(' ');
+      var sc = num(axis && (axis.score != null ? axis.score : (axis.completion != null ? axis.completion : axis.value)));
+      return /成立|完成|確立|A（成立）|S（完成）|established|complete/i.test(tx) || sc >= 70;
+    });
+  }
+  function hardFatal(result, cards, actKey, score){
+    var ms = (result && result.mainScores) || {};
+    var ae = (result && result.actEvaluation) || {};
+    var diag = (result && result.diagnosis) || {};
+    var text = arr(ae.missing).concat(arr(ae.warnings), arr(diag.missing), arr(diag.warnings), [ae.comment, ae.summary, diag.summary, diag.label]).map(str).join(' / ');
+    var defense = num(ms['防御']);
+    var fire = num(ms['火力']);
+    var draw = num(ms['ドロー']);
+    var scale = num(ms['スケール']);
+    var accident = num(ms['事故率']);
+    var silent = isSilentDeck(result, cards);
+    var sp = silent ? silentPackage(cards) : null;
+    var hasEstablishedAxis = axisEstablished(result) || (sp && (sp.act1Ready || sp.act2Ready || sp.act3Ready));
+    // impl173: 旧summary/1st文言だけでA/SをBへ落とさない。
+    // 未成立系テキストは、実際に成立軸・完成パッケージが無い場合だけ致命扱いする。
+    if(!hasEstablishedAxis && /主軸未成立|勝ち筋未成立|コンボ未成立/.test(text)) return true;
+    if(/致命的|何もできない|完全に機能しない/.test(text) && !hasEstablishedAxis) return true;
+    // 数値が極端に低い場合だけ真の致命不足にする。
+    if(defense > 0 && defense < 12) return true;
+    if(fire > 0 && fire < 12) return true;
+    if(draw > 0 && draw < 10 && /重要札|回転|循環|届か/.test(text)) return true;
+    if(actKey === 'act3' && scale > 0 && scale < 12 && /ボス|長期|スケール|決定力/.test(text)) return true;
+    if(accident >= 88) return true;
+    // AoE不足・横並び注意・浮き札・支援不足・軽い初動不安は注意であって致命ではない。
+    return false;
+  }
+  function applySilentFloor(result, cards, actKey, score){
+    if(!isSilentDeck(result, cards)) return score;
+    var p = silentPackage(cards);
+    var next = score;
+    if(actKey === 'act1' && p.act1Ready) next = Math.max(next, 70);
+    if(actKey === 'act2' && p.act2Ready) next = Math.max(next, p.aoe ? 75 : 68);
+    if(actKey === 'act3' && p.act3Ready) next = Math.max(next, 80);
+    return clampScore(next);
+  }
+  function clearText(result){
+    var base = normalizeText((result && result.clearCapablePackage && result.clearCapablePackage.summary) || (result && result.impl162CompletePackage && result.impl162CompletePackage.summary) || '主軸と支えが成立しており、Act後半まで戦える形です。');
+    return 'クリア圏内。' + base + ' 不足タグ・浮き札・Act別注意は確認しながら、事故率を上げないピックとプレイ判断を優先します。';
+  }
+  function finalize(result, deckList){
+    if(!result || !result.actEvaluation) return result;
+    var cards = collectCards(result, deckList);
+    var actKey = detectActKey(result);
+    result.actEvaluation = Object.assign({}, result.actEvaluation);
+    var score = clampScore(result.actEvaluation.score);
+    score = applySilentFloor(result, cards, actKey, score);
+    var rankInfo = rankFromScore(score, actKey);
+    var fatal = hardFatal(result, cards, actKey, score);
+    // スコアラインでA/Sを確定したあと、Bへ戻すのは本当の致命不足だけ。
+    if((rankInfo.rank === 'A' || rankInfo.rank === 'S') && fatal){
+      rankInfo = rankFromScore(Math.min(score, 69), actKey);
+    }
+    result.actEvaluation.score = score;
+    result.actEvaluation.rank = rankInfo.rank;
+    result.actEvaluation.rankText = rankInfo.text;
+    result.actEvaluation.rankClass = rankInfo.className;
+    result.overallScore = score;
+    result.overallRank = rankInfo.rank;
+    result.finalOverallScore = score;
+    result.finalOverallRank = rankInfo.rank;
+    result.finalActKey = actKey;
+    result.finalFatalWeakness = fatal;
+    result.isClearCapable = (rankInfo.rank === 'A' || rankInfo.rank === 'S') && !fatal;
+    result.diagnosis = Object.assign({}, result.diagnosis || {});
+    if(result.isClearCapable){
+      result.diagnosis.label = 'クリア圏内';
+      result.diagnosis.overallLabel = 'クリア圏内';
+      result.diagnosis.summary = clearText(result);
+    }else{
+      result.diagnosis.label = normalizeText(result.diagnosis.label || result.diagnosis.overallLabel || '');
+      result.diagnosis.overallLabel = result.diagnosis.label;
+      result.diagnosis.summary = normalizeText(result.diagnosis.summary || '現在のデッキ内容から総合診断を確認中です。');
+    }
+    return result;
+  }
+  window.impl173FinalizeAnalysis = finalize;
+  window.impl172FinalizeAnalysis = finalize;
+  if(typeof window.registerAnalyzeDeckPostProcessor === 'function'){
+    window.registerAnalyzeDeckPostProcessor(function(result, deckList){ return finalize(result, deckList); });
+  }
+  var previousClear = typeof window.clearCapableStateImpl159 === 'function' ? window.clearCapableStateImpl159 : null;
+  window.clearCapableStateImpl159 = function(a, tags){
+    var tuned = finalize(Object.assign({}, a || {}), arr(a && (a.cards || a.deck || a.deckList)));
+    if(tuned && tuned.isClearCapable) return {clear:true, impl172Final:true};
+    if(previousClear){
+      var base = previousClear.apply(this, arguments) || {};
+      return Object.assign({}, base, {clear:false, impl172Final:true});
+    }
+    return {clear:false, impl172Final:true};
+  };
+})();
+</script>
+
 </body>
 </html>
