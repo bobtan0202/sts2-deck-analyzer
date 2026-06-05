@@ -3612,7 +3612,7 @@ header{padding:24px 26px;border-radius:28px;}
   border-radius:20px !important;
 }
 #view-diagnosis .priorityKicker::after{
-  content:' / なぜ弱いか';
+  content:' / 弱点';
   color:#64748b;
   font-weight:900;
 }
@@ -9612,7 +9612,7 @@ function closeTopHeroGuideV200(){
         <div class="cardListBody">
           <section class="characterSelectPanel">
             <span class="miniBadge">キャラクター選択</span>
-            <h3>スターターデッキから始める</h3>
+            <h3>キャラクターを選択する</h3>
             <p>キャラを選ぶと、初期デッキ・カード一覧・診断がそのキャラ向けに切り替わります。</p>
             <div id="heroTabs" class="heroTabs"></div>
             <div class="heroIntro">
@@ -19131,9 +19131,10 @@ function calculateOneTurnDamageEstimate(deckList, precomputedMaxDamage){
   }
   const hasPrimalPower = (deckList || []).some(x=>x && x.id === "primal_power");
   if(precomputedMaxDamage && !hasPrimalPower){
+    const dmg = Math.max(0, Math.round(Number(precomputedMaxDamage.damage || 0)));
     return {
-      damage:Math.max(0, Math.round(Number(precomputedMaxDamage.damage || 0))),
-      route:compactRoute(precomputedMaxDamage.line || [])
+      damage:dmg,
+      route:dmg > 0 ? compactRoute(precomputedMaxDamage.line || []) : "なし"
     };
   }
   const hands = combosSample(instances, handSize, PERF_LIMITS.maxHandSamples);
@@ -19218,7 +19219,8 @@ function calculateOneTurnDamageEstimate(deckList, precomputedMaxDamage){
       if(candidate.damage > best.damage) best = candidate;
     }
   }
-  return {damage:Math.max(0, Math.round(best.damage || 0)), route:best.route || "なし"};
+  const finalDamage = Math.max(0, Math.round(best.damage || 0));
+  return {damage:finalDamage, route:finalDamage > 0 ? (best.route || "なし") : "なし"};
 }
 
 function renderOneTurnDamageEstimate(estimate){
@@ -19263,8 +19265,10 @@ function analyzeHandBrickBreakdown(hands, deckList, precomputedDamageTurns, prec
     const bestDamage = precomputedDamageTurns && precomputedDamageTurns[handIndex] ? precomputedDamageTurns[handIndex] : bestTurn(h,deckList,"damage");
     const bestBlock = precomputedBlockTurns && precomputedBlockTurns[handIndex] ? precomputedBlockTurns[handIndex] : bestTurn(h,deckList,"block");
 
-    // 攻撃事故：防御しかない、または初手で最低限の打点が出ない
-    const attackBrick = attackCards.length === 0 || bestDamage.damage <= 6;
+    // 攻撃事故：直接アタック枚数ではなく、生成物込みで実際に出せる初動打点を見る
+    // ナイフ生成などは bestTurn 側で生成カード込みの打点として評価されるため、
+    // アタックカード0枚だけで事故扱いにしない。
+    const attackBrick = Number(bestDamage && bestDamage.damage || 0) <= 6;
 
     // 防御事故：攻撃しかない、または初手で最低限のブロックが出ない
     const defenseBrick = defenseCards.length === 0 || bestBlock.block <= 5;
@@ -19939,17 +19943,24 @@ function analyzeDeck(deckList){
     avgBlock: avg(turnBlock.map(x=>x.block)),
     front,
     aoe,
+    attackBrickRate,
+    handBrickRate,
+    actionShortageRate,
+    energyLoadScore,
     baneCount: cards.filter(function(c){ return typeof isAscendersBaneCard === "function" && isAscendersBaneCard(c); }).length
   };
-  const practicalFrontloadScore = Math.max(0, Math.min(100, Math.round(
-    Math.max(
-      (practicalValidationPayload.oneTurnMaxDamage - 10) * 2.2 + 25,
-      practicalValidationPayload.avgDamage * 2.4
-    )
-    + Math.min(8, Math.max(0, practicalValidationPayload.front) * 1.2)
-    + Math.min(6, Math.max(0, practicalValidationPayload.aoe) * 3)
-    - Math.min(5, Math.max(0, practicalValidationPayload.baneCount) * 1.5)
-  )));
+  const practicalFrontloadScore = (typeof frontloadSupportScoreFromPractical === 'function')
+    ? frontloadSupportScoreFromPractical(practicalValidationPayload)
+    : Math.max(0, Math.min(100, Math.round(
+        Math.max(
+          (practicalValidationPayload.oneTurnMaxDamage - 10) * 2.2 + 25,
+          practicalValidationPayload.avgDamage * 2.4
+        )
+        + Math.min(8, Math.max(0, practicalValidationPayload.front) * 1.2)
+        + Math.min(6, Math.max(0, practicalValidationPayload.aoe) * 3)
+        - Math.min(24, Math.max(0, practicalValidationPayload.attackBrickRate || 0) * 44)
+        - Math.min(5, Math.max(0, practicalValidationPayload.baneCount) * 1.5)
+      )));
   const practicalFrontloadMetric = {
     key:'frontload',
     name:'フロントロード',
@@ -21040,7 +21051,7 @@ function compactSilentSummary(axis){
 
 function renderAxisNeedTags(axis){
   const profile = typeof axisProfileByName === "function" ? axisProfileByName(axis) : null;
-  const needs = profile?.tags?.length ? profile.tags : (axis.needs?.length ? axis.needs : ["大きな不足なし"]);
+  const needs = profile?.tags?.length ? profile.tags : (axis.needs?.length ? axis.needs : ["主軸パーツはそろっています"]);
   return needs.slice(0,3).map((n,i)=>`<span class="winAxisTag ${i===0 && !profile && axis.needs?.length ? 'priority' : ''}">${n}</span>`).join("");
 }
 
@@ -21432,7 +21443,7 @@ function diagnoseDeck(s){
     圧縮率:m.圧縮率||0,
     スケール:m.スケール||0
   };
-  return {name,summary,maturity,missing:missing.length?missing:["大きな不足なし"],warnings:warns.length?warns:["大きな注意点なし"],radar};
+  return {name,summary,maturity,missing:missing.length?missing:["主軸パーツはそろっています"],warnings:warns.length?warns:["大きな注意点なし"],radar};
 }
 
 function pct(x){return Math.round(x*100)+"%";}
@@ -21966,7 +21977,7 @@ function buildBeginnerConclusion(a){
     return "カードの重さに対してエナジーが足りず、手札を使い切れないターンが出やすいです。軽いカードかエナジー補助が欲しいです。";
   }
   if(e.rank === "S" || e.rank === "A"){
-    return "主要な勝ち筋が成立しており、火力・防御・スケールも高い水準です。大きな補強よりも、無理なルート選択・事故リスクを上げないピック・プレイ判断のブレに注意したい状態です。";
+    return "主要な勝ち筋はかなり形になっており、デッキだけで見るとクリアを狙える水準です。ここからはデッキだけでは見えない要素にも注意してください。";
   }
   return e.comment || "デッキの方向性は見えていますが、まだ決定打が足りません。弱点を1つずつ補うと安定します。";
 }
@@ -22661,7 +22672,7 @@ function buildRadarDeckDescription(a){
     }
     if(primary && primary.name){
       pushRadarDeckLine(lines, primary.name + 'を中心に勝ち筋が形になっています');
-      pushRadarDeckLine(lines, '不足タグを見ながら、最後に削り切る火力やドローを補いたい状態です');
+      pushRadarDeckLine(lines, '残っている弱点を確認しながら、最後に削り切る火力やドローを補いたい状態です');
       if(dangerLead) pushRadarDeckLine(lines, dangerLead);
       return lines.slice(0,3).join('<br>');
     }
@@ -22693,9 +22704,9 @@ function buildRadarDeckDescription(a){
   }
 
   if(completion >= 70){
-    pushRadarDeckLine(lines, '勝ち筋の方向性はありますが、ドロー・防御・エナジーを補うと安定しやすくなります');
+    pushRadarDeckLine(lines, '主軸は形になっていますが、防御の安定性・再現性・決定力を補うとさらに安定します');
   }else if(completion >= 45){
-    pushRadarDeckLine(lines, '方向性は見えていますが、補助札や安定性はまだもう一歩です');
+    pushRadarDeckLine(lines, '主軸は形になっていますが、防御の安定性や再現性はまだ補いたい状態です');
   }else{
     pushRadarDeckLine(lines, 'まだ全体のつながりと安定性が不足しています');
   }
@@ -23111,7 +23122,7 @@ function sts2NormalizePublicNeedItem(item){
     {re:/ナイフ強化/, name:'ナイフを伸ばすカード', text:'ナイフは作れますが、火力として伸ばすカードを補うと押し切りやすくなります。'},
     {re:/スライペイオフ|スライのペイオフ|スライのリターン/, name:'スライのリターン', text:'スライする動きはありますが、スライしたことで得をするカードがまだ足りません。'},
     {re:/勝ち筋への接続|勝ち筋接続/, name:'勝ち筋につながるカード', text:'手札を回す動きはありますが、敵を倒す勝ち筋へつながるカードを補いたい状態です。'},
-    {re:/防御・補助カード/, name:'防御・補助カード', text:'防御やドローを補い、勝ち筋を安定して動かしやすくします。'},
+    {re:/防御・補助カード/, name:'防御・補助カード', text:'防御・ドロー・手札操作などで、勝ち筋を安定して動かしやすくします。'},
     {re:/毒またはナイフの勝ち筋|毒・ナイフの勝ち筋/, name:'毒・ナイフの勝ち筋', text:'回す動きはありますが、敵を倒すための毒・ナイフ側の勝ち筋を補いたい状態です。'}
   ];
   let name = raw || '補強カード';
@@ -23437,7 +23448,7 @@ function renderProductionOutputSlots(a){
     if(/ナイフ強化/.test(name)) return 'ナイフは作れますが、火力として伸ばすカードを補うと押し切りやすくなります。';
     if(/スライペイオフ|スライのペイオフ/.test(name)) return 'スライする動きはありますが、スライしたことで得をするカードがまだ足りません。';
     if(/勝ち筋への接続|勝ち筋接続/.test(name)) return '手札を回す動きはありますが、敵を倒す勝ち筋へつながるカードを補いたい状態です。';
-    if(/防御・補助カード/.test(name)) return '防御やドローを補い、勝ち筋を安定して動かしやすくします。';
+    if(/防御・補助カード/.test(name)) return '防御・ドロー・手札操作などで、勝ち筋を安定して動かしやすくします。';
     if(/毒またはナイフの勝ち筋|毒・ナイフの勝ち筋/.test(name)) return '回す動きはありますが、敵を倒すための毒・ナイフ側の勝ち筋を補いたい状態です。';
     if(/フロントカード/.test(name)) return '序盤から使える火力や防御を増やし、雑魚戦やエリート戦で削られすぎないようにします。';
     if(/早めに使える火力/.test(name)) return '雑魚戦やエリート戦で削られすぎないよう、早めに使える火力を補います。';
@@ -24380,7 +24391,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
     if(!root) return;
     const panel=document.createElement('div');
     panel.className='advancedInsightCard winConditionFullCard';
-    panel.innerHTML = `<div class="advancedInsightTitle">なぜ弱いか：不足要素診断</div>${window.renderDeficiencyTagPanel(a,8)}`;
+    panel.innerHTML = `<div class="advancedInsightTitle">弱点：不足要素診断</div>${window.renderDeficiencyTagPanel(a,8)}`;
     root.prepend(panel);
   };
 
@@ -24677,7 +24688,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
       const caution=tags.filter(t=>t.className==='caution').slice(0,4);
       cards.innerHTML = `
         <div class="skeletonTagBlock">
-          <div class="skeletonTagTitle"><span>弱点</span><span class="skeletonTagHint">なぜ弱いか</span></div>
+          <div class="skeletonTagTitle"><span>弱点</span><span class="skeletonTagHint">確認</span></div>
           <div class="structureChipRow">${tags.length ? tags.slice(0,6).map(chip).join('') : chip({name:'大きな不足は少なめ',className:'ok',severity:'安定'})}</div>
           ${details('判定理由', tags.slice(0,4).flatMap(t => (t.reasons||[]).slice(0,1).map(r=>`${t.name}：${r}`)))}
         </div>
@@ -24742,7 +24753,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
     const tags=tagsOf(a);
     const panel=document.createElement('div');
     panel.className='advancedInsightCard winConditionFullCard implementation7DeficiencyOverview';
-    panel.innerHTML=`<div class="advancedInsightTitle">構造診断：なぜ弱いか</div><div class="structureChipRow">${tags.slice(0,8).map(chip).join('') || chip({name:'大きな不足は少なめ',className:'ok',severity:'安定'})}</div>${details('判定理由', tags.slice(0,6).flatMap(t=>(t.reasons||[]).slice(0,1).map(r=>`${t.name}：${r}`)))}`;
+    panel.innerHTML=`<div class="advancedInsightTitle">構造診断：弱点</div><div class="structureChipRow">${tags.slice(0,8).map(chip).join('') || chip({name:'大きな不足は少なめ',className:'ok',severity:'安定'})}</div>${details('判定理由', tags.slice(0,6).flatMap(t=>(t.reasons||[]).slice(0,1).map(r=>`${t.name}：${r}`)))}`;
     root.prepend(panel);
   };
   // startup-stability: initial full rerender skipped; user actions render normally.
@@ -25799,7 +25810,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
           : 'Act1では致命的な負け筋は目立ちません。次はエリート前の火力と初動防御を整えると安定します。';
       return {
         headline:'クリア圏内',
-        sub:'主要な勝ち筋が成立しており、火力・防御・スケールも高い水準です。大きな補強よりも、無理なルート選択・事故リスクを上げないピック・プレイ判断のブレに注意したい状態です。'
+        sub:'主要な勝ち筋はかなり形になっており、デッキだけで見るとクリアを狙える水準です。ここからはデッキだけでは見えない要素にも注意してください。'
       };
     }
     if(severeSetupRisk){
@@ -26439,7 +26450,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
   function axisNeedsForCard(axis){
     if(axis && axis._fallback) return ['接続不足', '主軸未確定'];
     var axisProfile = typeof axisProfileByName === 'function' ? axisProfileByName(axis) : null;
-    return (axisProfile && axisProfile.tags && axisProfile.tags.length ? axisProfile.tags : (Array.isArray(axis && axis.needs) && axis.needs.length ? axis.needs : ['大きな不足なし'])).slice(0,3);
+    return (axisProfile && axisProfile.tags && axisProfile.tags.length ? axisProfile.tags : (Array.isArray(axis && axis.needs) && axis.needs.length ? axis.needs : ['主軸パーツはそろっています'])).slice(0,3);
   }
   function cleanAxisCurrentCommentText(value){
     return escDisplay(value, 'まだ判断材料が少ない状態です。').replace(/^現状[：:]\s*/, '').trim();
@@ -26838,6 +26849,16 @@ function renderFlexibleWinConditionPanel(rows, scores){
       winExits:'決定力',
 
       // 共通系
+      defenseSupport:'防御カード',
+      blockSupport:'ブロック補助',
+      drawSupport:'ドロー',
+      drawAccess:'ドロー',
+      energySupport:'エナジー補助',
+      winConditionSupport:'勝ち筋接続',
+      frontloadSupport:'序盤対応力',
+      vulnerableSupport:'弱体活用',
+      exhaustSupport:'廃棄活用',
+      selfDamageSupport:'自傷活用',
       sustainedDefense:'継戦防御',
       drawBase:'ドロー',
       energyBase:'エナジー',
@@ -26855,7 +26876,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
     if(label) return label;
     return raw
       .replace(/接続/g,'コンボ')
-      .replace(/防御支え/g,'防御')
+      .replace(/防御の安定性/g,'防御')
       .replace(/火力出口/g,'決定力')
       .replace(/有効札密度/g,'デッキ品質')
       .replace(/有効攻撃密度/g,'デッキ品質')
@@ -26884,10 +26905,10 @@ function renderFlexibleWinConditionPanel(rows, scores){
       .replace(/弱体ペイオフ/g,'弱体を活かすカード')
       .replace(/自傷ペイオフ/g,'HP消費を勝ち筋へつなげるカード')
       .replace(/ブロック火力ペイオフ/g,'ブロックを火力へ変えるカード')
-      .replace(/防御やドローのコンボ/g,'防御やドローの支え')
+      .replace(/防御やドローのコンボ/g,'防御やドローの補助')
       .replace(/有効札密度/g,'デッキ品質')
       .replace(/有効攻撃密度/g,'デッキ品質')
-      .replace(/防御支え/g,'防御')
+      .replace(/防御の安定性/g,'防御')
       .replace(/接続/g,'つながり')
       .trim();
   }
@@ -26941,7 +26962,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
     var chip = function(x){ return '<span class="winAxisTag">' + escDisplay(x, 'なし') + '</span>'; };
     var chipBlock = '<div class="winAxisChipBlock">'
       + '<div class="winAxisChipLine"><span class="winAxisChipLabel">成立</span>' + (present.length ? present.map(chip).join('') : '<span class="winAxisTag">確認中</span>') + '</div>'
-      + '<div class="winAxisChipLine"><span class="winAxisChipLabel">改善</span>' + (improve.length ? improve.map(chip).join('') : '<span class="winAxisTag">大きな不足なし</span>') + '</div>'
+      + '<div class="winAxisChipLine"><span class="winAxisChipLabel">改善</span>' + (improve.length ? improve.map(chip).join('') : '<span class="winAxisTag">主軸パーツはそろっています</span>') + '</div>'
       + '</div>';
     return '<div class="winAxisCard ' + st.cls + '"><div class="winAxisHead"><div class="winAxisName">' + escDisplay(axisName, 'まだ判定できません') + '</div><div class="winAxisStatus ' + st.cls + '">' + escDisplay(axis.status || st.label, '未成立') + '</div></div><div class="winAxisSummary">' + escDisplay(summary, 'まだ判断材料が少ない状態です。') + '</div>' + chipBlock + '</div>';
   }
@@ -26952,9 +26973,12 @@ function renderFlexibleWinConditionPanel(rows, scores){
     if(n >= 35) return {label:'低い', cls:'low'};
     return {label:'危険', cls:'danger'};
   }
-  function supportMetricScore(metrics, patterns, fallback){
+  function supportMetricMatch(metrics, patterns){
     metrics = Array.isArray(metrics) ? metrics : [];
-    var found = metrics.find(function(m){ var s = String((m && (m.name || m.label || m.key)) || ''); return patterns.some(function(p){ return p.test(s); }); });
+    return metrics.find(function(m){ var s = String((m && (m.name || m.label || m.key)) || ''); return patterns.some(function(p){ return p.test(s); }); }) || null;
+  }
+  function supportMetricScore(metrics, patterns, fallback){
+    var found = supportMetricMatch(metrics, patterns);
     return found ? Number(found.score != null ? found.score : found.value) || 0 : (fallback || 0);
   }
   function frontloadSupportScoreFromPractical(stats){
@@ -26974,6 +26998,12 @@ function renderFlexibleWinConditionPanel(rows, scores){
     base += Math.min(8, Math.max(0, taggedFront) * 1.2);
     base += Math.min(8, Math.max(0, burst) * 2.5);
     base += Math.min(6, Math.max(0, aoe) * 3);
+    var attackBrick = Number(stats.attackBrickRate || stats.attackBrick || 0) || 0;
+    if(attackBrick > 1) attackBrick = attackBrick / 100;
+    var actionShort = Number(stats.actionShortageRate || stats.actionShortage || 0) || 0;
+    if(actionShort > 1) actionShort = actionShort / 100;
+    base -= Math.min(24, Math.max(0, attackBrick) * 44);
+    base -= Math.min(10, Math.max(0, actionShort) * 18);
     base -= Math.min(5, Math.max(0, Number(stats.baneCount || 0)) * 1.5);
     return typeof clamp === 'function' ? clamp(base) : Math.max(0, Math.min(100, Math.round(base)));
   }
@@ -27048,6 +27078,11 @@ function renderFlexibleWinConditionPanel(rows, scores){
     var deckDerived = (typeof frontloadContributorDebugFromDeck === 'function') ? frontloadContributorDebugFromDeck().score : 0;
     if(found){
       var metricScore = Number(found.score != null ? found.score : found.value) || 0;
+      // 実測系フロントロード指標がある場合は、後段のカード名由来スコアで再加点しない。
+      // これにより、補助性能のフロントロード表示が1T打点・平均打点・攻撃事故リスクと同じ経路を見やすくなる。
+      if(found.practical || /oneTurnMaxDamage|avgDamage|practical/i.test(String(found.source || ''))){
+        return Math.max(metricScore, derived || 0, fallback || 0);
+      }
       return Math.max(metricScore, derived || 0, contributorDerived || 0, deckDerived || 0, fallback || 0);
     }
     return Math.max(derived || 0, contributorDerived || 0, deckDerived || 0, fallback || 0);
@@ -27060,6 +27095,175 @@ function renderFlexibleWinConditionPanel(rows, scores){
   function practicalStatsFromValidation(validation){
     if(!validation) return null;
     return validation.practicalValidation || validation.practical || validation.stats || validation;
+  }
+  function rawSupportMetricScore(validation, patterns){
+    var metrics = validation && Array.isArray(validation.supportMetrics) ? validation.supportMetrics : [];
+    var found = supportMetricMatch(metrics, patterns || []);
+    return found ? winAreaClampScore(Number(found.score != null ? found.score : found.value) || 0) : 0;
+  }
+  function frontloadFoundationDeckContext(validation){
+    var rawDeck = [];
+    if(validation && Array.isArray(validation.deckCards)) rawDeck = validation.deckCards;
+    else if(validation && Array.isArray(validation.currentDeck)) rawDeck = validation.currentDeck;
+    else {
+      try{ rawDeck = (typeof deck !== 'undefined' && Array.isArray(deck)) ? deck : []; }catch(e){ rawDeck = []; }
+    }
+    function arr(x){ return Array.isArray(x) ? x : (x ? [x] : []); }
+    function resolveCard(item){
+      var base = null;
+      try{ base = (typeof getCard === 'function') ? getCard(item) : item; }catch(e){ base = item; }
+      if(!base) return null;
+      var c = Object.assign({}, base);
+      var isUp = !!(item && (item.upgraded === true || item.sourceUpgraded || item.upgradedInstance || item.isUpgraded));
+      if(isUp && c.upgraded && typeof c.upgraded === 'object') Object.keys(c.upgraded).forEach(function(k){ c[k] = c.upgraded[k]; });
+      c.sourceUpgraded = isUp;
+      return c;
+    }
+    function nameOf(c){ return String((c && (c.nameJa || c.name || c.nameEn || c.id)) || ''); }
+    function has(c, token){
+      var hay = [c && c.id, c && c.nameJa, c && c.name, c && c.nameEn].concat(arr(c && c.tags), arr(c && c.roles), arr(c && c.synergyTags)).join(' ');
+      return token.test(hay);
+    }
+    function costOf(c){
+      var n = Number((typeof effectiveCostValue === 'function') ? effectiveCostValue(c) : (c && c.cost));
+      return Number.isFinite(n) ? n : 1;
+    }
+    var cards = arr(rawDeck).map(resolveCard).filter(Boolean);
+    var total = cards.length || 0;
+    var nonStarter = 0, lowCost = 0, highCost = 0, powerCount = 0, setupCards = 0, immediateAttackSignals = 0, immediateDefenseSignals = 0, nonStarterImmediateAttack = 0, aoeSignals = 0;
+    cards.forEach(function(c){
+      var name = nameOf(c);
+      var id = String(c && c.id || '');
+      var type = String(c && c.type || '').toLowerCase();
+      var rarity = String(c && c.rarity || '').toLowerCase();
+      var cost = costOf(c);
+      var damage = Number(c && c.damage) || 0;
+      var hits = Math.max(1, Number(c && c.hits) || 1);
+      var block = Number(c && c.block) || 0;
+      var starter = rarity === 'starter' || /(^|_)(strike|defend)$/.test(id) || /^(ストライク|防御)$/.test(name);
+      if(!starter) nonStarter++;
+      if(cost <= 1) lowCost++;
+      if(cost >= 2) highCost++;
+      if(type === 'power') powerCount++;
+      if(type === 'power' || has(c, /セットアップ|setup|エンジン|engine|廃棄ペイオフ|毒エンジン|スケーリング|scaling/i)) setupCards++;
+      var effectiveDamage = damage * hits;
+      var immediateAttack = (type === 'attack' && effectiveDamage > 0) || has(c, /frontload|フロントロード|即時火力|軽量火力|ナイフ生成|剣の舞|ナイフの雨|鬼火|インフェルノ|旋風刃|サンダークラップ|ノックアウト|blade.?dance|dagger.?spray|knife.?rain|fiend.?fire|inferno|whirlwind|thunderclap/i);
+      if(immediateAttack) immediateAttackSignals++;
+      if(immediateAttack && !starter) nonStarterImmediateAttack++;
+      var immediateDefense = (block > 0 && cost <= 1) || has(c, /初動防御|防御|ブロック|脱力|弱体|足払い|バックフリップ|サバイバー|無力化|受け流し|アイアンウェーブ|shrug|backflip|leg.?sweep|neutralize|survivor|weak/i);
+      if(immediateDefense) immediateDefenseSignals++;
+      if((c && c.aoe) || has(c, /AoE|全体攻撃|aoe|ナイフの雨|インフェルノ|旋風刃|サンダークラップ|dagger.?spray|knife.?rain|inferno|whirlwind|thunderclap/i)) aoeSignals++;
+    });
+    var activeAxes = [];
+    var axes = [];
+    if(validation){
+      if(Array.isArray(validation.winConditionAxes)) axes = axes.concat(validation.winConditionAxes);
+      if(Array.isArray(validation.axes)) axes = axes.concat(validation.axes);
+    }
+    axes.forEach(function(axis){ if(typeof winAreaRankValue === 'function' && winAreaRankValue(axis) >= 3) activeAxes.push(axis); });
+    return {
+      cards:cards,
+      total:total,
+      nonStarter:nonStarter,
+      lowCostRatio: total ? lowCost / total : 0,
+      highCostRatio: total ? highCost / total : 0,
+      powerRatio: total ? powerCount / total : 0,
+      setupRatio: total ? setupCards / total : 0,
+      immediateAttackSignals:immediateAttackSignals,
+      immediateDefenseSignals:immediateDefenseSignals,
+      nonStarterImmediateAttack:nonStarterImmediateAttack,
+      aoeSignals:aoeSignals,
+      hasFormedAxis: activeAxes.length > 0,
+      formedAxisCount: activeAxes.length,
+      hasStrongAxis: activeAxes.some(function(a){ return typeof winAreaRankValue === 'function' && winAreaRankValue(a) >= 4; }),
+      hasCompleteAxis: activeAxes.some(function(a){ return typeof winAreaRankValue === 'function' && winAreaRankValue(a) >= 5; })
+    };
+  }
+  function normalizedRate(v){
+    var n = Number(v) || 0;
+    if(n > 1) n = n / 100;
+    return Math.max(0, Math.min(1, n));
+  }
+  function frontloadFoundationPressure(validation, stats, ctx){
+    stats = stats || {};
+    ctx = ctx || frontloadFoundationDeckContext(validation);
+    var avgCost = Number(stats.avgCost || stats.averageCost || validation && (validation.avgCost || validation.averageCost) || 0) || 0;
+    var energy = rawSupportMetricScore(validation, [/エナジー能力|エナジー|energy/i]);
+    var pressure = 0;
+    pressure += Math.max(0, ctx.powerRatio - 0.25) * 22;
+    pressure += Math.max(0, ctx.setupRatio - 0.35) * 16;
+    pressure += Math.max(0, ctx.highCostRatio - 0.30) * 18;
+    pressure += Math.max(0, avgCost - 1.30) * 16;
+    if(energy && energy < 45) pressure += (45 - energy) * 0.22;
+    return Math.max(0, Math.min(32, pressure));
+  }
+  function frontloadFoundationInitialAttackScore(validation){
+    var stats = practicalStatsFromValidation(validation) || {};
+    var ctx = frontloadFoundationDeckContext(validation);
+    var oneTurn = Number(stats.oneTurn || stats.oneTurnMaxDamage || stats.maxDamage1T || 0) || 0;
+    var avg = Number(stats.avgDamage || stats.averageDamage || 0) || 0;
+    var brick = normalizedRate(stats.attackBrickRate || stats.attackBrick || 0);
+    var actionShort = normalizedRate(stats.actionShortageRate || stats.actionShortage || 0);
+    var fire = rawSupportMetricScore(validation, [/火力能力|火力$|damage|attack/i]);
+    var score = 0;
+    score += Math.min(50, avg * 1.75);
+    score += Math.min(22, Math.max(0, oneTurn - 8) * 0.80);
+    score += Math.max(0, 1 - brick) * 18;
+    score += Math.max(-8, (ctx.lowCostRatio - 0.55) * 18);
+    score += Math.min(8, ctx.nonStarterImmediateAttack * 4);
+    score += Math.min(8, fire * 0.08);
+    score -= Math.min(34, brick * 44);
+    score -= Math.min(12, actionShort * 18);
+    score -= frontloadFoundationPressure(validation, stats, ctx);
+    score -= Math.min(5, Math.max(0, Number(stats.baneCount || 0)) * 1.2);
+    if(!ctx.hasFormedAxis && ctx.nonStarterImmediateAttack <= 0) score -= 10;
+    if(ctx.total && ctx.nonStarter <= 0) score -= 8;
+    if(avg <= 0 && oneTurn <= 0) score = Math.min(score, 20);
+    return winAreaClampScore(score);
+  }
+  function frontloadFoundationInitialDefenseScore(validation){
+    var stats = practicalStatsFromValidation(validation) || {};
+    var ctx = frontloadFoundationDeckContext(validation);
+    var avgBlock = Number(stats.avgBlock || stats.averageBlock || stats.avgDefense || stats.averageDefense || 0) || 0;
+    var maxBlock = Number(stats.oneTurnMaxBlock || stats.maxBlock1T || stats.maxDefense1T || 0) || 0;
+    var weakOrMitigation = Number(stats.weak || stats.weakScore || stats.mitigation || stats.mitigationScore || 0) || 0;
+    var blockScore = rawSupportMetricScore(validation, [/防御力|防御$|block|defense/i]) || Number(stats.blockScore || stats.defenseScore || stats.defense || 0) || 0;
+    var actionShort = normalizedRate(stats.actionShortageRate || stats.actionShortage || 0);
+    var score = 0;
+    score += Math.min(34, avgBlock * 3.4);
+    score += Math.min(20, Math.max(0, maxBlock - 6) * 1.4);
+    score += Math.min(26, blockScore * 0.36);
+    score += Math.min(12, weakOrMitigation * 0.45);
+    score += Math.min(8, ctx.immediateDefenseSignals * 2.5);
+    score += Math.max(-6, (ctx.lowCostRatio - 0.45) * 12);
+    score -= Math.min(10, actionShort * 16);
+    score -= frontloadFoundationPressure(validation, stats, ctx) * 0.45;
+    score -= Math.min(5, Math.max(0, Number(stats.baneCount || 0)) * 1.2);
+    return winAreaClampScore(score);
+  }
+  function frontloadFoundationEliteScore(validation, attackScore, defenseScore, aoeScore, aoeQualityScore){
+    var stats = practicalStatsFromValidation(validation) || {};
+    var ctx = frontloadFoundationDeckContext(validation);
+    var energy = rawSupportMetricScore(validation, [/エナジー能力|エナジー|energy/i]);
+    var stability = rawSupportMetricScore(validation, [/事故耐性|安定性|stability|accident/i]);
+    var actionShort = normalizedRate(stats.actionShortageRate || stats.actionShortage || 0);
+    var brick = normalizedRate(stats.attackBrickRate || stats.attackBrick || 0);
+    var aoePart = Math.max(Number(aoeScore) || 0, (Number(aoeQualityScore) || 0) * 0.85);
+    var score = 0;
+    score += (Number(attackScore) || 0) * 0.42;
+    score += (Number(defenseScore) || 0) * 0.26;
+    score += aoePart * 0.18;
+    score += Math.min(8, (energy || 0) * 0.08);
+    score += Math.min(7, (stability || 0) * 0.07);
+    if(ctx.hasFormedAxis) score += 4;
+    if(ctx.hasStrongAxis) score += 3;
+    if(ctx.hasCompleteAxis) score += 3;
+    score -= frontloadFoundationPressure(validation, stats, ctx) * 0.70;
+    score -= Math.min(10, actionShort * 18);
+    score -= Math.min(12, brick * 16);
+    if(!ctx.hasFormedAxis) score -= 6;
+    if(ctx.aoeSignals <= 0 && aoePart < 35) score -= 5;
+    return winAreaClampScore(score);
   }
   function eliteSupportScoreFromPractical(stats, fallback){
     if(!stats) return fallback || 0;
@@ -27106,9 +27310,38 @@ function renderFlexibleWinConditionPanel(rows, scores){
     var derived = 42 + Math.min(10, front * 0.08) + Math.min(8, avgBlock * 0.25) - Math.min(5, Number(stats.baneCount || 0) * 1.5);
     return Math.max(winAreaClampScore(derived), fallback || 0);
   }
+
+  function initialAttackSupportScoreFromPractical(stats, fallback){
+    if(!stats) return fallback || 0;
+    var oneTurn = Number(stats.oneTurn || stats.oneTurnMaxDamage || stats.maxDamage1T || 0) || 0;
+    var avg = Number(stats.avgDamage || stats.averageDamage || 0) || 0;
+    var attackBrick = Number(stats.attackBrickRate || stats.attackBrick || 0) || 0;
+    if(attackBrick > 1) attackBrick = attackBrick / 100;
+    var actionShort = Number(stats.actionShortageRate || stats.actionShortage || 0) || 0;
+    if(actionShort > 1) actionShort = actionShort / 100;
+    var derived = Math.max(0, (oneTurn - 10) * 2.1 + 24, avg * 2.3);
+    derived -= Math.min(28, Math.max(0, attackBrick) * 48);
+    derived -= Math.min(10, Math.max(0, actionShort) * 16);
+    derived -= Math.min(5, Math.max(0, Number(stats.baneCount || 0)) * 1.2);
+    return Math.max(winAreaClampScore(derived), fallback || 0);
+  }
+  function initialDefenseSupportScoreFromPractical(stats, fallback){
+    if(!stats) return fallback || 0;
+    var avgBlock = Number(stats.avgBlock || stats.averageBlock || stats.avgDefense || stats.averageDefense || 0) || 0;
+    var maxBlock = Number(stats.oneTurnMaxBlock || stats.maxBlock1T || stats.maxDefense1T || 0) || 0;
+    var weakOrMitigation = Number(stats.weak || stats.weakScore || stats.mitigation || stats.mitigationScore || 0) || 0;
+    var blockScore = Number(stats.blockScore || stats.defenseScore || stats.defense || 0) || 0;
+    var actionShort = Number(stats.actionShortageRate || stats.actionShortage || 0) || 0;
+    if(actionShort > 1) actionShort = actionShort / 100;
+    var derived = Math.max(0, avgBlock * 4.2 + 12, (maxBlock - 8) * 2.2 + 22, blockScore * 0.72, weakOrMitigation * 0.8);
+    derived -= Math.min(10, Math.max(0, actionShort) * 16);
+    derived -= Math.min(5, Math.max(0, Number(stats.baneCount || 0)) * 1.2);
+    return Math.max(winAreaClampScore(derived), fallback || 0);
+  }
   function supportMetricScoreFromValidation(validation, patterns, deriveFn, fallback){
     var metrics = validation && Array.isArray(validation.supportMetrics) ? validation.supportMetrics : [];
-    var metricScore = supportMetricScore(metrics, patterns, 0);
+    var foundMetric = supportMetricMatch(metrics, patterns);
+    var metricScore = foundMetric ? Number(foundMetric.score != null ? foundMetric.score : foundMetric.value) || 0 : 0;
     var stats = practicalStatsFromValidation(validation);
     var derived = typeof deriveFn === 'function' ? deriveFn(stats, fallback || 0) : 0;
     var labelProbe = (patterns || []).map(function(p){ return String(p); }).join(' / ');
@@ -27117,6 +27350,9 @@ function renderFlexibleWinConditionPanel(rows, scores){
     if(/エリート|elite/i.test(labelProbe)) contributor = Math.max(contributor, eliteContributorScoreFromPayload(validation || {}));
     if(/AoE|aoe/i.test(labelProbe)) contributor = Math.max(contributor, aoeContributorScoreFromPayload(validation || {}));
     if(/セットアップ|setup/i.test(labelProbe)) contributor = Math.max(contributor, setupContributorScoreFromPayload(validation || {}));
+    if(foundMetric && (foundMetric.practical || /oneTurnMaxDamage|avgDamage|aoe|setup|practical/i.test(String(foundMetric.source || '')))){
+      return Math.max(metricScore || 0, derived || 0, fallback || 0);
+    }
     return Math.max(metricScore || 0, derived || 0, contributor || 0, fallback || 0);
   }
   if(typeof window !== 'undefined'){
@@ -27130,6 +27366,11 @@ function renderFlexibleWinConditionPanel(rows, scores){
     window.aoeSupportScoreFromPractical = aoeSupportScoreFromPractical;
     window.aoeQualitySupportScoreFromPractical = aoeQualitySupportScoreFromPractical;
     window.setupSpeedSupportScoreFromPractical = setupSpeedSupportScoreFromPractical;
+    window.initialAttackSupportScoreFromPractical = initialAttackSupportScoreFromPractical;
+    window.initialDefenseSupportScoreFromPractical = initialDefenseSupportScoreFromPractical;
+    window.frontloadFoundationInitialAttackScore = frontloadFoundationInitialAttackScore;
+    window.frontloadFoundationInitialDefenseScore = frontloadFoundationInitialDefenseScore;
+    window.frontloadFoundationEliteScore = frontloadFoundationEliteScore;
   }
   function supportMetricRow(label, score){
     var st = supportDisplayLabelState(score);
@@ -27139,12 +27380,21 @@ function renderFlexibleWinConditionPanel(rows, scores){
     metrics = Array.isArray(metrics) ? metrics : [];
     validation = validation || {supportMetrics:metrics};
     var get = function(patterns, fallback, deriveFn){ return supportMetricScoreFromValidation(validation, patterns, deriveFn, fallback); };
+    // 補助性能のフロントロード内訳は、supportMetrics の最大値拾いではなく、
+    // 全Actで使う「立ち上がり性能」として表示専用に再計算する。
+    // 1T最大打点だけではなく、平均打点・事故率・軽さ・セットアップ依存を合わせて見る。
+    var frontloadInitialAttack = frontloadFoundationInitialAttackScore(validation);
+    var frontloadInitialDefense = frontloadFoundationInitialDefenseScore(validation);
+    var frontloadAoe = get([/^AoE$|全体攻撃性能$|aoe$/i], 0, aoeSupportScoreFromPractical);
+    var frontloadAoeQuality = get([/AoEの質|全体攻撃性能の質|aoeQuality/i], 0, aoeQualitySupportScoreFromPractical);
+    var frontloadElite = frontloadFoundationEliteScore(validation, frontloadInitialAttack, frontloadInitialDefense, frontloadAoe, frontloadAoeQuality);
     var groups = [
-      ['序盤対応力', [
-        ['フロントロード', frontloadSupportScoreFromValidation(validation, 0)],
-        ['AoE', get([/^AoE$|全体攻撃性能$|aoe$/i], 0, aoeSupportScoreFromPractical)],
-        ['AoEの質', get([/AoEの質|全体攻撃性能の質|aoeQuality/i], 0, aoeQualitySupportScoreFromPractical)],
-        ['エリート突破力', get([/エリート突破力|エリート対応|elite/i], 0, eliteSupportScoreFromPractical)]
+      ['フロントロード', [
+        ['初動火力', frontloadInitialAttack],
+        ['初動防御', frontloadInitialDefense],
+        ['AoE', frontloadAoe],
+        ['AoEの質', frontloadAoeQuality],
+        ['エリート突破力', frontloadElite]
       ]],
       ['デッキの回転', [
         ['ドロー', get([/ドロー能力|ドロー|draw/i], 0)],
@@ -27269,19 +27519,35 @@ function renderFlexibleWinConditionPanel(rows, scores){
     }
     earlyEstablished = Array.from(new Set(earlyEstablished.length ? earlyEstablished : ['最低限の初動'])).slice(0,3);
     earlyImprove = Array.from(new Set(earlyImprove)).slice(0,4);
-    var earlyCard = '<div class="winAxisCard ' + (earlyScore >= 55 ? 'ok' : earlyScore >= 35 ? 'mid' : 'bad') + '"><div class="winAxisHead"><div class="winAxisName">フロントロード</div><div class="winAxisStatus ' + (earlyScore >= 55 ? 'ok' : earlyScore >= 35 ? 'mid' : 'bad') + '">' + earlyState.label + '</div></div><div class="winAxisSummary">戦闘開始直後から火力や防御を出し、雑魚戦やエリート戦で削られすぎない力です。</div><div class="winAxisChipBlock"><div class="winAxisChipLine"><span class="winAxisChipLabel">成立</span>' + earlyTagList(earlyEstablished) + '</div><div class="winAxisChipLine"><span class="winAxisChipLabel">改善</span>' + earlyTagList(earlyImprove.length ? earlyImprove : ['大きな不足なし']) + '</div></div></div>';
+    var earlyCard = '<div class="winAxisCard ' + (earlyScore >= 55 ? 'ok' : earlyScore >= 35 ? 'mid' : 'bad') + '"><div class="winAxisHead"><div class="winAxisName">フロントロード</div><div class="winAxisStatus ' + (earlyScore >= 55 ? 'ok' : earlyScore >= 35 ? 'mid' : 'bad') + '">' + earlyState.label + '</div></div><div class="winAxisSummary">戦闘開始直後に使える火力・防御・AoEを総合して見ます。</div><div class="winAxisChipBlock"><div class="winAxisChipLine"><span class="winAxisChipLabel">成立</span>' + earlyTagList(earlyEstablished) + '</div><div class="winAxisChipLine"><span class="winAxisChipLabel">改善</span>' + earlyTagList(earlyImprove.length ? earlyImprove : ['主軸パーツはそろっています']) + '</div></div></div>';
     var specialEstablishedPlans = specialPlans.filter(function(p){ return winAreaRankValue(p) >= 3; }).map(winAreaSpecialAxisFromPlan);
     var specialReferencePlans = specialPlans.filter(function(p){ return winAreaRankValue(p) < 3; });
     var activeCards = activeAxes.map(function(axis){ return renderWinAreaAxisCard(axis, validation); }).concat(specialEstablishedPlans.map(function(axis){ return renderWinAreaAxisCard(axis, validation); }));
     var activeHtml = activeCards.length ? activeCards.join('') : '<div class="winAxisEmpty">なし。まだ勝ち筋として見えるB以上の軸はありません。</div>';
     var inactiveHtml = inactiveAxes.length ? inactiveAxes.map(function(axis){ return renderWinAreaAxisCard(axis, validation); }).join('') : '<div class="winAxisEmpty">未成立の軸は少なめです。</div>';
     var specialHtml = specialPlans.length ? (specialReferencePlans.length ? specialReferencePlans.map(function(p){ return renderWinAreaAxisCard(winAreaSpecialAxisFromPlan(p), validation); }).join('') : '<div class="winAxisEmpty">B以上の特殊勝ち筋は「成立中の勝ち筋」に表示しています。</div>') : '<div class="winAxisEmpty">原始の力 / ヘル・レイザーは検出されていません。</div>';
+    var cautionItems = [];
+    function pushCaution(label){ if(label && cautionItems.indexOf(label) < 0) cautionItems.push(label); }
+    if(!activeAxes.length && !specialEstablishedPlans.length) pushCaution('主軸未成立');
+    if(earlyScore < 45) pushCaution('序盤対応力不足');
+    else if(earlyScore < 55) pushCaution('序盤対応力');
+    if(earlyFrontload < 45) pushCaution('フロントロード不足');
+    if(earlyAoe < 45 || earlyAoeQuality < 45) pushCaution('全体攻撃不足');
+    if(earlyElite < 45) pushCaution('エリート突破力不足');
+    var energyScore = supportMetricScoreFromValidation(validation, [/エナジー能力|エナジー|energy/i], 0);
+    if(energyScore > 0 && energyScore < 45) pushCaution('エナジー不足');
+    var statsForCaution = practicalStatsFromValidation(validation) || {};
+    var avgCost = Number(statsForCaution.avgCost || statsForCaution.averageCost || validation.avgCost || validation.averageCost || 0) || 0;
+    if(avgCost >= 1.6) pushCaution('重量事故');
+    var cautionContext = Object.assign({}, validation || {}, {__winAreaHasFormedAxis: !!(activeAxes.length || specialEstablishedPlans.length)});
+    var cautionHtml = renderWinAreaCautionBlock(cautionItems, cautionContext);
     var support = renderGroupedSupportMetrics(validation.supportMetrics || [], validation);
-    return '<div class="winStructurePanel"><div class="winStructureTitle">勝ち筋エリア</div><div class="winStructureLead">序盤対応力、成立中の勝ち筋、未成立の軸、特殊勝ち筋、補助性能を分けて表示します。</div>'
+    return '<div class="winStructurePanel"><div class="winStructureTitle">勝ち筋エリア</div><div class="winStructureLead">序盤対応力、成立中の勝ち筋、未成立の軸、特殊勝ち筋、注意点、補助性能を分けて表示します。</div>'
       + '<div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">序盤対応力</div><div class="winSectionHint">雑魚戦やエリート戦で削られすぎないか</div></div><div class="winAxisGrid">' + earlyCard + '</div>' + earlyWarning + '</div>'
       + '<div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">成立中の勝ち筋</div><div class="winSectionHint">B以上の軸を上に表示します</div></div><div class="winAxisGrid">' + activeHtml + '</div></div>'
       + '<div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">未成立の軸</div><div class="winSectionHint">C以下の軸です。必要なパーツを確認します</div></div><div class="winAxisGrid">' + inactiveHtml + '</div></div>'
       + '<div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">特殊勝ち筋</div><div class="winSectionHint">通常5軸とは別枠で確認します</div></div><div class="winAxisGrid">' + specialHtml + '</div></div>'
+      + '<div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">注意点</div><div class="winSectionHint">補助性能を見る前に確認する要素</div></div>' + cautionHtml + '</div>'
       + '<div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">補助性能</div><div class="winSectionHint">勝ち筋を補助する能力</div></div>' + support + '</div>'
       + '</div>';
   }
@@ -27335,44 +27601,167 @@ function renderFlexibleWinConditionPanel(rows, scores){
       if(/shivFinishers|shivGeneratedCards/.test(k)) return 'ナイフ決定力';
       if(/discardEnablers/.test(k)) return 'スライ始動';
       if(/actualSlyReturns|slyPayoffs|slyEngines/.test(k)) return 'スライのリターン';
-      if(/discardDefenseSupport|shivDefenseSupport/.test(k)) return '防御支え';
+      if(/discardDefenseSupport|shivDefenseSupport/.test(k)) return '防御の安定性';
       if(/connectedToShiv|supportedMajorAxes/.test(k)) return '勝ち筋接続';
       if(/conditionalPoisonEnablers/.test(k)) return '条件付き毒始動';
       if(/poisonEnablers/.test(k)) return '毒の始動';
       if(/poisonPayoffs/.test(k)) return '毒のペイオフ';
       if(/conditionalPoisonFinishers/.test(k)) return '毒の決定力';
       if(/poisonFinishers/.test(k)) return '毒のフィニッシャー';
-      if(/poisonDefense/.test(k)) return '毒を支える防御';
+      if(/poisonDefense/.test(k)) return '毒を進める防御';
       if(/poisonScaling/.test(k)) return '毒の伸び';
       if(/poisonAccess/.test(k)) return '毒カードを引き込む手段';
       if(/poisonShivLinks/.test(k)) return '毒とナイフの接続';
+      if(/shivPoisonLinks/.test(k)) return 'ナイフと毒の接続';
       if(/poisonDiscardLinks/.test(k)) return '毒とスライの接続';
-      return k;
+      return String(k || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/Links$/i, 'の接続');
     });
     present = sts2SilentWinAreaList(present).slice(0,3);
     var improve = sts2SilentWinAreaList([].concat(axis.missingPieces || [], axis.nextNeed || [])).slice(0,3);
     var chip = function(x){ return '<span class="winAxisTag">' + escDisplay(x, '確認中') + '</span>'; };
     var role = roleLabel ? '<span class="winAxisTag priority">' + escDisplay(roleLabel, '軸') + '</span>' : '';
-    return '<div class="winAxisCard ' + st.cls + '" data-silent-win-axis="true"><div class="winAxisHead"><div class="winAxisName">' + escDisplay(name, 'まだ判定できません') + '</div><div class="winAxisStatus ' + st.cls + '">' + escDisplay(st.label, '確認中') + '</div></div><div class="winAxisSummary">' + escDisplay(reason, 'まだ判断材料が少ない状態です。') + '</div><div class="winAxisChipBlock"><div class="winAxisChipLine"><span class="winAxisChipLabel">役割</span>' + role + (present.length ? present.map(chip).join('') : '<span class="winAxisTag">確認中</span>') + '</div><div class="winAxisChipLine"><span class="winAxisChipLabel">改善</span>' + (improve.length ? improve.map(chip).join('') : '<span class="winAxisTag">大きな不足なし</span>') + '</div></div></div>';
+    return '<div class="winAxisCard ' + st.cls + '" data-silent-win-axis="true"><div class="winAxisHead"><div class="winAxisName">' + escDisplay(name, 'まだ判定できません') + '</div><div class="winAxisStatus ' + st.cls + '">' + escDisplay(st.label, '確認中') + '</div></div><div class="winAxisSummary">' + escDisplay(reason, 'まだ判断材料が少ない状態です。') + '</div><div class="winAxisChipBlock"><div class="winAxisChipLine"><span class="winAxisChipLabel">役割</span>' + role + (present.length ? present.map(chip).join('') : '<span class="winAxisTag">確認中</span>') + '</div><div class="winAxisChipLine"><span class="winAxisChipLabel">改善</span>' + (improve.length ? improve.map(chip).join('') : '<span class="winAxisTag">主軸パーツはそろっています</span>') + '</div></div></div>';
   }
   function sts2SilentWinAreaConnectedHtml(summary){
     var links = (Array.isArray(summary && summary.connectedAxes) && summary.connectedAxes.length) ? summary.connectedAxes : (Array.isArray(summary && summary.crossAxisLinks) ? summary.crossAxisLinks.filter(function(x){ return x && x.connected; }) : []);
-    if(!links.length) return '<div class="winAxisEmpty">明確な軸間接続はまだ少なめです。</div>';
+    if(!links.length){
+      var bestName = sts2SilentWinAreaText(summary && summary.bestAxis && (summary.bestAxis.name || summary.bestAxis.label), '');
+      var routeName = String(summary && (summary.silentRouteCandidate || summary.route || '') || '');
+      var isUnformedRoute = /(starter|unformed)/i.test(routeName);
+      var hasRealBestAxis = bestName && !/未確定|まだ主軸|主軸なし|なし|確認中/.test(bestName);
+      var text = (isUnformedRoute || !hasRealBestAxis)
+        ? 'まだ三軸のどれも成立していないため、軸同士の接続を見る段階ではありません。'
+        : (bestName + 'は見えていますが、毒・ナイフ・スライを直接つなぐカードはまだ少なめです。');
+      return '<div class="winAxisCard mid"><div class="winAxisHead"><div class="winAxisName">軸間接続</div><div class="winAxisStatus mid">少なめ</div></div><div class="winAxisSummary">' + escDisplay(text, '軸同士の直接的なつながりはまだ少なめです。') + '</div></div>';
+    }
     return links.map(function(link){
       var cards = sts2SilentWinAreaList(link.cards || []);
       return '<div class="winAxisCard ok"><div class="winAxisHead"><div class="winAxisName">' + escDisplay(link.label || '軸間接続', '軸間接続') + '</div><div class="winAxisStatus ok">接続</div></div><div class="winAxisSummary">' + escDisplay(link.reason || '軸同士が勝ち筋としてつながっています。', '軸同士が勝ち筋としてつながっています。') + '</div><div class="winAxisChipBlock"><div class="winAxisChipLine"><span class="winAxisChipLabel">カード</span>' + (cards.length ? cards.map(function(x){ return '<span class="winAxisTag">' + escDisplay(x, '確認中') + '</span>'; }).join('') : '<span class="winAxisTag">確認中</span>') + '</div></div></div>';
     }).join('');
   }
+  function sts2WinAreaCautionChipText(value){
+    return sts2SilentWinAreaText(value, '').replace(/^(クリア圏内に近づける前に見る要素|残っている不足要素を確認します)$/,'').trim();
+  }
+  function sts2WinAreaCautionText(items, summary){
+    var joined = sts2SilentWinAreaList(items || []).join(' / ');
+    var hasStarter = /主軸未成立|序盤対応力不足|初動不足/.test(joined) && !/クリア圏内まであと一歩/.test(joined);
+    var hasDefense = /防御|ブロック|受け|被弾/.test(joined);
+    var hasConsistency = /再現|安定|事故|ドロー|引き込|到達|アクセス|回転/.test(joined);
+    var hasFinisher = /決定力|押し切|フィニッシャ|ボス火力|長期戦不足/.test(joined);
+    var hasAoe = /AoE|全体|複数|横並び/.test(joined);
+    var hasEnergy = /エナジー|重量|コスト/.test(joined);
+    var hasExternal = /デッキ外|レリック|ポーション|HP|敵配置|ルート/.test(joined);
+    if(hasStarter) return 'まだ勝ち筋がまとまっていないため、まずは序盤を支える火力・防御・AoEを補いたい状態です。';
+    if(hasDefense && hasConsistency) return '勝ち筋は見えていますが、クリア圏内に近づけるには、防御の安定性と再現性をもう少し補いたい状態です。';
+    if(hasDefense) return '勝ち筋が動くまで、被ダメージを抑える手段がもう少し欲しい状態です。';
+    if(hasConsistency) return '必要な動きに安定して入りやすくする補助がもう少し欲しい状態です。';
+    if(hasFinisher) return '勝ち筋は見えていますが、最後まで押し切るカードがもう少し欲しい状態です。';
+    if(hasAoe) return '複数敵を早く減らす手段が少なく、横並び戦で被弾が増えやすい状態です。';
+    if(hasEnergy) return '手札を使い切りにくい場面があるため、軽いカードやエナジー補助を確認したい状態です。';
+    if(hasExternal) return 'デッキ構造だけでは見えないHP・レリック・ポーション・敵配置にも注意したい状態です。';
+    if(summary && summary.clearCapableCandidate) return 'デッキだけで見ると形はできていますが、実戦では事故リスクやデッキ外要素にも注意したい状態です。';
+    return '残っている不足要素を確認したい状態です。';
+  }
+  function sts2WinAreaCautionHasFormedAxis(summary){
+    summary = summary || {};
+    if(typeof summary.__winAreaHasFormedAxis === 'boolean') return summary.__winAreaHasFormedAxis;
+    if(summary.clearCapableCandidate) return true;
+    if(Array.isArray(summary.sRankAxes) && summary.sRankAxes.length) return true;
+    if(Array.isArray(summary.primaryAxes) && summary.primaryAxes.length) return true;
+    if(Array.isArray(summary.formingAxes) && summary.formingAxes.length) return true;
+    if(summary.bestAxis && typeof sts2SilentWinAreaRankValue === 'function' && sts2SilentWinAreaRankValue(summary.bestAxis) >= 3) return true;
+    var axes = [];
+    if(Array.isArray(summary.winConditionAxes)) axes = axes.concat(summary.winConditionAxes);
+    if(Array.isArray(summary.axes)) axes = axes.concat(summary.axes);
+    if(axes.some(function(axis){ return winAreaRankValue(axis) >= 3; })) return true;
+    var name = sts2SilentWinAreaText(summary.winConditionNameCandidate || summary.mainWinPlanName || summary.diagnosisNameCandidate || (summary.bestAxis && summary.bestAxis.name), '');
+    if(name && !/未確定|未成立|まだ主軸|主軸なし|まだ何者|なし|確認中/.test(name)) return true;
+    return false;
+  }
+  function sts2WinAreaCautionTitleModel(items, summary){
+    items = sts2SilentWinAreaList(items || []);
+    summary = summary || {};
+    var hasFormedAxis = sts2WinAreaCautionHasFormedAxis(summary);
+    var hasClearStep = items.some(function(x){ return /クリア圏内まであと一歩/.test(String(x || '')); });
+    var starterOnly = !hasFormedAxis && items.some(function(x){ return /主軸未成立|序盤対応力不足|初動不足/.test(String(x || '')); });
+    var hasDanger = items.some(function(x){ return /防御不足|火力不足|初動不足|全体攻撃不足|重量事故|エナジー不足/.test(String(x || '')); });
+    if(starterOnly){ return {title:'主軸未成立への対応', status:'未成立', cls:'bad'}; }
+    if(hasClearStep && !summary.clearCapableCandidate){ return {title:'クリア圏内への確認', status:'あと一歩', cls:hasDanger ? 'mid' : 'mid'}; }
+    return {title:'残っている注意点', status:'注意', cls:hasDanger ? 'mid' : 'mid'};
+  }
+  function renderWinAreaCautionBlock(items, summary){
+    items = sts2SilentWinAreaList(items || []).map(sts2WinAreaCautionChipText).filter(Boolean);
+    items = items.filter(function(x,i,a){ return a.indexOf(x) === i; }).slice(0,5);
+    if(!items.length) return '<div class="winAxisEmpty">大きな注意点は少なめです。</div>';
+    var titleModel = sts2WinAreaCautionTitleModel(items, summary);
+    var cls = titleModel.cls || 'mid';
+    var status = titleModel.status || '注意';
+    var title = titleModel.title || '残っている注意点';
+    var chips = items.map(function(x, idx){
+      var priority = idx === 0 ? ' priority' : '';
+      return '<span class="winAxisTag' + priority + '">' + escDisplay(x, '注意') + '</span>';
+    }).join('');
+    var text = sts2WinAreaCautionText(items, summary);
+    return '<div class="winAxisCard ' + cls + ' winAreaCautionCard" data-win-area-caution="true"><div class="winAxisHead"><div class="winAxisName">' + escDisplay(title, '残っている注意点') + '</div><div class="winAxisStatus ' + cls + '">' + escDisplay(status, '注意') + '</div></div><div class="winAxisSummary">' + escDisplay(text, '残っている注意点を確認します。') + '</div><div class="winAxisChipBlock"><div class="winAxisChipLine"><span class="winAxisChipLabel">要素</span>' + chips + '</div></div></div>';
+  }
+  function sts2SilentWinAreaCautionText(items, summary){
+    return sts2WinAreaCautionText(items, summary);
+  }
   function sts2SilentWinAreaCautionHtml(summary){
     var blockers = sts2SilentWinAreaList(summary && summary.clearCapableBlockers || []);
+    if((summary && (summary.route === 'starter' || summary.route === 'unformed' || summary.starterEquivalentEarly)) || /未確定|まだ主軸なし|主軸未確定/.test(sts2SilentWinAreaText(summary && (summary.winConditionNameCandidate || summary.mainWinPlanName || (summary.bestAxis && summary.bestAxis.name)), ''))){
+      blockers = blockers.map(function(x){ return String(x) === 'クリア圏内まであと一歩' ? '主軸未成立' : x; });
+    }
     var guard = summary && summary.clearCapableGuard || {};
     var guardReasons = sts2SilentWinAreaList(guard.guardReasons || []);
     var items = blockers.concat(guardReasons).filter(function(x,i,a){ return a.indexOf(x) === i; }).slice(0,4);
     if(summary && summary.clearCapableCandidate && !items.length){
       items = ['デッキ外要素に注意', '事故リスク'];
     }
-    if(!items.length) return '<div class="winAxisEmpty">大きな注意点は少なめです。</div>';
-    return '<div class="deficiencyTagPanel">' + items.map(function(x){ return '<span class="deficiencyTag caution">' + escDisplay(x, '注意') + '</span>'; }).join('') + '</div>';
+    return renderWinAreaCautionBlock(items, summary);
+  }
+
+  function sts2SilentWinAreaEarlyHtml(summary){
+    summary = summary || {};
+    var debug = summary.silentFrontloadDebug || {};
+    function n(v, fallback){ var x = Number(v); return Number.isFinite(x) ? x : (fallback || 0); }
+    var score = n(summary.frontloadScore != null ? summary.frontloadScore : debug.frontloadScore, 0);
+    var earlyScore = n(summary.earlyResponseScore != null ? summary.earlyResponseScore : debug.earlyResponseScore, score);
+    var frontNames = sts2SilentWinAreaList((debug.silentFrontCardNames || debug.frontCardNames || (summary.support && summary.support.frontCards) || []));
+    var defenseNames = sts2SilentWinAreaList((debug.earlyDefenseCards || (summary.support && summary.support.defense) || []));
+    var aoeNames = sts2SilentWinAreaList(debug.earlyAoECards || []);
+    var weakNames = sts2SilentWinAreaList(debug.earlyWeakCards || []);
+    var noFrontEvidence = frontNames.length === 0 && score < 35;
+    var label = noFrontEvidence ? 'なし' : (score >= 75 ? '高い' : score >= 55 ? '十分' : score >= 35 ? '低い' : '低い');
+    var cls = score >= 55 ? 'ok' : score >= 35 ? 'mid' : 'bad';
+    var established = [];
+    var improve = [];
+    if(noFrontEvidence){
+      established.push('なし');
+      improve.push('フロントカード');
+      improve.push('軽い火力');
+      improve.push('AoE');
+    }else{
+      if(score >= 55 || frontNames.length) established.push('フロントロード');
+      if(defenseNames.length) established.push('防御の安定性');
+      if(aoeNames.length) established.push('AoE');
+      if(weakNames.length) established.push('被ダメ軽減');
+      if(score < 55) improve.push('フロントカード');
+      if(!aoeNames.length) improve.push('AoE');
+      if(earlyScore < 55) improve.push('初動防御');
+      if(!improve.length) improve.push('主軸パーツはそろっています');
+    }
+    established = sts2SilentWinAreaList(established).slice(0,3);
+    improve = sts2SilentWinAreaList(improve).slice(0,4);
+    var summaryText = noFrontEvidence
+      ? '戦闘開始直後に使える火力・防御・AoEが薄く、セットアップ前に削られやすい状態です。'
+      : '戦闘開始直後に使える火力・防御・AoEを総合して見ます。';
+    var note = (score < 35)
+      ? '<div class="winStructureNote">序盤対応力が低く、まずは早めに使える火力・防御の安定性・AoEを補いたい状態です。</div>'
+      : (score < 55 ? '<div class="winStructureNote">序盤対応力は最低限ありますが、追加のフロントカードや防御の安定性を確認したい状態です。</div>' : '');
+    function chip(x){ return '<span class="winAxisTag">' + escDisplay(x, '確認中') + '</span>'; }
+    var card = '<div class="winAxisCard ' + cls + '" data-silent-early-response="true"><div class="winAxisHead"><div class="winAxisName">フロントロード</div><div class="winAxisStatus ' + cls + '">' + escDisplay(label, '確認中') + '</div></div><div class="winAxisSummary">' + escDisplay(summaryText, '序盤対応力を確認します。') + '</div><div class="winAxisChipBlock"><div class="winAxisChipLine"><span class="winAxisChipLabel">成立</span>' + (established.length ? established.map(chip).join('') : '<span class="winAxisTag">なし</span>') + '</div><div class="winAxisChipLine"><span class="winAxisChipLabel">改善</span>' + (improve.length ? improve.map(chip).join('') : '<span class="winAxisTag">主軸パーツはそろっています</span>') + '</div></div></div>';
+    return '<div class="winSection" data-silent-early-response-section="true"><div class="winSectionHead"><div class="winSectionTitle">序盤対応力</div><div class="winSectionHint">雑魚戦やエリート戦で削られすぎないか</div></div><div class="winAxisGrid">' + card + '</div>' + note + '</div>';
   }
   function sts2GetSilentWinAreaProbe(a){
     a = a || {};
@@ -27403,13 +27792,31 @@ function renderFlexibleWinConditionPanel(rows, scores){
     var summary = pack.summary;
     var best = summary.bestAxis || null;
     var secondary = summary.secondaryAxis || null;
-    var active = Array.isArray(summary.primaryAxes) && summary.primaryAxes.length ? summary.primaryAxes.slice() : [];
-    if(!active.length && best) active.push(best);
-    active = active.filter(function(axis){ return sts2SilentWinAreaRankValue(axis) >= 3; });
-    var seen = {};
-    active = active.filter(function(axis){ var k = String(axis && (axis.key || axis.name)); if(seen[k]) return false; seen[k]=true; return true; });
-    var inactive = Array.isArray(summary.unformedAxes) ? summary.unformedAxes.slice() : [];
-    if(!inactive.length && Array.isArray(pack.probe && pack.probe.axisList)) inactive = pack.probe.axisList.filter(function(axis){ return sts2SilentWinAreaRankValue(axis) < 3; });
+    var allSilentAxes = [];
+    if(pack.probe && Array.isArray(pack.probe.axisList)) allSilentAxes = pack.probe.axisList.slice();
+    if(!allSilentAxes.length){
+      allSilentAxes = []
+        .concat(Array.isArray(summary.primaryAxes) ? summary.primaryAxes : [])
+        .concat(Array.isArray(summary.formingAxes) ? summary.formingAxes : [])
+        .concat(Array.isArray(summary.unformedAxes) ? summary.unformedAxes : []);
+      if(best) allSilentAxes.push(best);
+      if(secondary) allSilentAxes.push(secondary);
+    }
+    var seenAllAxes = {};
+    allSilentAxes = allSilentAxes.filter(function(axis){
+      var k = String(axis && (axis.key || axis.id || axis.name || axis.label || ''));
+      if(!k || seenAllAxes[k]) return false;
+      seenAllAxes[k] = true;
+      return true;
+    });
+    var active = allSilentAxes.filter(function(axis){ return sts2SilentWinAreaRankValue(axis) >= 3; });
+    active.sort(function(aAxis, bAxis){
+      if(best && aAxis && aAxis.key === best.key) return -1;
+      if(best && bAxis && bAxis.key === best.key) return 1;
+      return sts2SilentWinAreaRankValue(bAxis) - sts2SilentWinAreaRankValue(aAxis);
+    });
+    var inactive = allSilentAxes.filter(function(axis){ return sts2SilentWinAreaRankValue(axis) < 3; });
+    inactive.sort(function(aAxis, bAxis){ return sts2SilentWinAreaRankValue(bAxis) - sts2SilentWinAreaRankValue(aAxis); });
     var valueText = '主軸：' + sts2SilentWinAreaText(summary.winConditionNameCandidate || summary.mainWinPlanName || (best && best.name), '主軸未確定');
     var lead = summary.clearCapableCandidate ? '勝ち筋として完成寄りの軸と、支える補助軸を分けて表示します。' : '成立中の軸と、クリア圏内に届く前の不足を分けて表示します。';
     var activeHtml = active.length ? active.map(function(axis, idx){
@@ -27424,7 +27831,8 @@ function renderFlexibleWinConditionPanel(rows, scores){
       if(typeof renderGroupedSupportMetrics === 'function' && a && a.characterWinValidation && Array.isArray(a.characterWinValidation.supportMetrics)) supportHtml = renderGroupedSupportMetrics(a.characterWinValidation.supportMetrics || [], a.characterWinValidation);
     }catch(_e){ supportHtml = ''; }
     if(!supportHtml) supportHtml = '<div class="winAxisEmpty">補助性能の詳細は通常評価側で確認します。</div>';
-    return '<div class="advancedInsightCard winConditionFullCard" data-win-support-connected="true" data-silent-win-area-connected="true" data-display-safe="true" data-deck-size="' + Number(a && a.deckSize || 0) + '"><div class="advancedInsightTitle">勝ち筋分類</div><div class="advancedInsightValue">' + escDisplay(valueText, '主軸未確定') + '</div><div class="advancedInsightText">' + escDisplay(lead, '勝ち筋と補助性能を分けて整理します。') + '</div><div class="winStructurePanel"><div class="winStructureTitle">勝ち筋エリア</div><div class="winStructureLead">Silent三軸の成立度、軸同士の接続、クリア圏内前の注意点を分けて表示します。</div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">成立中の勝ち筋</div><div class="winSectionHint">B以上の軸を上に表示します</div></div><div class="winAxisGrid">' + activeHtml + '</div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">軸同士の接続</div><div class="winSectionHint">毒・ナイフ・スライのつながり</div></div><div class="winAxisGrid">' + sts2SilentWinAreaConnectedHtml(summary) + '</div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">未成立の軸</div><div class="winSectionHint">C以下の軸です。必要なパーツを確認します</div></div><div class="winAxisGrid">' + inactiveHtml + '</div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">注意点</div><div class="winSectionHint">クリア圏内へ上げる前に見る要素</div></div>' + sts2SilentWinAreaCautionHtml(summary) + '</div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">補助性能</div><div class="winSectionHint">勝ち筋を補助する能力</div></div>' + supportHtml + '</div></div></div>';
+    var earlyHtml = sts2SilentWinAreaEarlyHtml(summary);
+    return '<div class="advancedInsightCard winConditionFullCard" data-win-support-connected="true" data-silent-win-area-connected="true" data-display-safe="true" data-deck-size="' + Number(a && a.deckSize || 0) + '"><div class="advancedInsightTitle">勝ち筋分類</div><div class="advancedInsightValue">' + escDisplay(valueText, '主軸未確定') + '</div><div class="advancedInsightText">' + escDisplay(lead, '勝ち筋と補助性能を分けて整理します。') + '</div><div class="winStructurePanel"><div class="winStructureTitle">勝ち筋エリア</div><div class="winStructureLead">序盤対応力、Silent三軸の成立度、軸同士の接続、クリア圏内前の注意点を分けて表示します。</div>' + earlyHtml + '<div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">成立中の勝ち筋</div><div class="winSectionHint">B以上の軸を上に表示します</div></div><div class="winAxisGrid">' + activeHtml + '</div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">軸同士の接続</div><div class="winSectionHint">毒・ナイフ・スライのつながり</div></div><div class="winAxisGrid">' + sts2SilentWinAreaConnectedHtml(summary) + '</div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">未成立の軸</div><div class="winSectionHint">C以下の軸です。必要なパーツを確認します</div></div><div class="winAxisGrid">' + inactiveHtml + '</div></div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">注意点</div><div class="winSectionHint">残っている不足要素を確認します</div></div>' + sts2SilentWinAreaCautionHtml(summary) + '</div><div class="winSection"><div class="winSectionHead"><div class="winSectionTitle">補助性能</div><div class="winSectionHint">勝ち筋を補助する能力</div></div>' + supportHtml + '</div></div></div>';
   }
   function sts2ApplySilentDeckNameLimitedConnect(a){
     a = a || {};
@@ -27630,7 +28038,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
     if(/決定力|フィニッシュ|押し切|削り切|出口|ボス戦/.test(s)) return '🎯';
     if(/再現性|安定性|必要カード|欲しいカード|アクセス|引き込/.test(s)) return '🔎';
     if(/スライ|リターン|ドロー|回転|循環/.test(s)) return '🔁';
-    if(/主軸未成立|勝ち筋未成立|完成した主軸|S軸なし|起点|未成立/.test(s)) return '🧩';
+    if(/主軸未成立|勝ち筋未成立|完成した主軸|クリア圏内まであと一歩|S軸なし|起点|未成立/.test(s)) return '🧩';
     if(/接続|シナジー|つなが/.test(s)) return '🔗';
     if(/支援不足|遅い支援札/.test(s)) return '🪫';
     if(/毒/.test(s)) return '☠️';
@@ -27666,7 +28074,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
         {re:/ナイフ強化/, name:'ナイフを伸ばすカード', text:'ナイフは作れますが、火力として伸ばすカードを補うと押し切りやすくなります。'},
         {re:/スライペイオフ|スライのペイオフ|スライのリターン/, name:'スライのリターン', text:'スライする動きはありますが、スライしたことで得をするカードがまだ足りません。'},
         {re:/勝ち筋への接続|勝ち筋接続|主火力への接続不足/, name:'勝ち筋につながるカード', text:'手札を回す動きはありますが、敵を倒す勝ち筋へつながるカードを補いたい状態です。'},
-        {re:/防御・補助カード/, name:'防御・補助カード', text:'防御やドローを補い、勝ち筋を安定して動かしやすくします。'},
+        {re:/防御・補助カード/, name:'防御・補助カード', text:'防御・ドロー・手札操作などで、勝ち筋を安定して動かしやすくします。'},
         {re:/毒またはナイフの勝ち筋|毒・ナイフの勝ち筋/, name:'毒・ナイフの勝ち筋', text:'回す動きはありますが、敵を倒すための毒・ナイフ側の勝ち筋を補いたい状態です。'}
       ];
       for(const m of needMap){
@@ -27678,14 +28086,14 @@ function renderFlexibleWinConditionPanel(rows, scores){
       }
     }
     const reasonMap = [
-      {re:/防御不足|防御支え不足/, text:'セットアップ前に削られすぎないよう、防御カードを補いたい状態です。'},
+      {re:/防御不足|防御の安定性不足/, text:'セットアップ前に削られすぎないよう、ブロック・脱力・弱体などで被ダメージを抑えたい状態です。'},
       {re:/再現性不足|再現性確認/, text:'必要カードを引き込みにくく、勝ち筋が毎回安定して動くとは限りません。'},
       {re:/序盤対応力不足|フロントカード不足|初動不足/, text:'序盤の火力や防御が足りず、雑魚戦やエリート戦で削られやすい状態です。'},
       {re:/主火力への接続不足|回転した先の勝ち筋|勝ち筋への接続不足/, text:'手札を回す動きはありますが、敵を倒す主火力への接続がまだ弱い状態です。'},
       {re:/ボス戦の決定力不足|決定力不足|ナイフの出口|削り切る手段/, text:'動きはありますが、ボス戦で最後に削り切る手段がまだ薄い状態です。'},
-      {re:/S軸なし|完成した主軸なし/, name:'完成した主軸なし', text:'形成中の軸はありますが、クリア圏内に上げるには完成度や決定力がもう一段ほしい状態です。'},
+      {re:/S軸なし|完成した主軸なし|クリア圏内まであと一歩/, name:'クリア圏内まであと一歩', text:'勝ち筋は見えていますが、クリア圏内として見るには防御の安定性・再現性・決定力をもう少し確認したい状態です。'},
       {re:/スライのリターン不足/, text:'スライする動きはありますが、捨てたことで得をするカードがまだ足りません。'},
-      {re:/支援不足|遅い支援札/, text:'カード自体は役割がありますが、今のデッキでは活かす支えがまだ足りません。'},
+      {re:/支援不足|遅い支援札/, text:'カード自体は役割がありますが、今のデッキでは活かす補助がまだ足りません。'},
       {re:/デッキ外要素に注意|未対応要素あり/, name:'デッキ外要素に注意', text:'現在HP・レリック・ポーション・敵配置まではまだ見ていないため、実戦ではそこで崩れる可能性があります。'},
       {re:/事故リスク|手札事故/, text:'ここから重いカードや噛み合わないカードを増やすと、完成している勝ち筋に入りにくくなります。'}
     ];
@@ -28115,7 +28523,12 @@ function renderFlexibleWinConditionPanel(rows, scores){
     }
     function tagObj(name, cls, sev, reason){
       const rawName = String(name || '').trim() || '確認事項';
+      const normalizedRawName = ((rawName === 'S軸なし' || rawName === 'クリア圏内まであと一歩') && /starter|unformed/.test(route)) ? '主軸未成立' : rawName;
       const commonReasonMap = {
+        '主軸未成立': {
+          name:'主軸未成立',
+          reason:'まだ勝ち筋がまとまっていないため、まずは序盤対応力を補いたい状態です。'
+        },
         '未対応要素あり': {
           name:'デッキ外要素に注意',
           reason:'現在HP・レリック・ポーション・敵配置まではまだ見ていないため、実戦ではそこで崩れる可能性があります。'
@@ -28137,8 +28550,12 @@ function renderFlexibleWinConditionPanel(rows, scores){
           reason:'動きはありますが、ボス戦で最後に削り切る手段がまだ薄い状態です。'
         },
         'S軸なし': {
-          name:'完成した主軸なし',
-          reason:'形成中の軸はありますが、クリア圏内に上げるには完成度や決定力がもう一段ほしい状態です。'
+          name:'クリア圏内まであと一歩',
+          reason:'勝ち筋は見えていますが、クリア圏内として見るには防御の安定性・再現性・決定力をもう少し確認したい状態です。'
+        },
+        'クリア圏内まであと一歩': {
+          name:'クリア圏内まであと一歩',
+          reason:'勝ち筋は見えていますが、クリア圏内として見るには防御の安定性・再現性・決定力をもう少し確認したい状態です。'
         },
         '回転した先の勝ち筋': {
           name:'回転した先の勝ち筋',
@@ -28162,11 +28579,11 @@ function renderFlexibleWinConditionPanel(rows, scores){
         },
         '防御不足': {
           name:'防御不足',
-          reason:'セットアップ前に削られすぎないよう、防御カードを補いたい状態です。'
+          reason:'セットアップ前に削られすぎないよう、ブロック・脱力・弱体などで被ダメージを抑えたい状態です。'
         },
-        '防御支え不足': {
-          name:'防御支え不足',
-          reason:'勝ち筋を進める間に受ける防御支えがまだ薄い状態です。'
+        '防御の安定性不足': {
+          name:'防御の安定性不足',
+          reason:'勝ち筋を進める間に被ダメージを軽減する手段がまだ不安定です。'
         },
         '序盤対応力不足': {
           name:'序盤対応力不足',
@@ -28174,15 +28591,15 @@ function renderFlexibleWinConditionPanel(rows, scores){
         },
         '支援不足': {
           name:'支援不足',
-          reason:'カード自体は役割がありますが、今のデッキでは活かす支えがまだ足りません。'
+          reason:'カード自体は役割がありますが、今のデッキでは活かす補助がまだ足りません。'
         }
       };
-      const mapped = commonReasonMap[rawName] || null;
-      const n = (mapped && mapped.name) || rawName;
+      const mapped = commonReasonMap[normalizedRawName] || null;
+      const n = (mapped && mapped.name) || normalizedRawName;
       const c = cls || (route === 'clearCapable' ? 'caution' : (route === 'forming' ? 'caution' : 'danger'));
       const genericReason = /次のピックやプレイで確認したい要素です|クリア圏内に上げる前に確認したい要素です|今のデッキで確認したい注意点です|次のピックで補うと安定しやすい不足です/.test(String(reason || ''));
       const finalReason = (!genericReason && reason) || (mapped && mapped.reason) || '今のデッキで確認したい注意点です。';
-      return firstViewRouteTagReasonFix({name:n, rawName:rawName, className:c, severity:sev || (c === 'fatal' ? '致命的' : c === 'danger' ? '危険' : c === 'ok' ? '安定' : '注意'), reasons:[String(finalReason)]});
+      return firstViewRouteTagReasonFix({name:n, rawName:normalizedRawName, originalRawName:rawName, className:c, severity:sev || (c === 'fatal' ? '致命的' : c === 'danger' ? '危険' : c === 'ok' ? '安定' : '注意'), reasons:[String(finalReason)]});
     }
     function needObj(name){
       const n = String(name || '').trim() || '補強カード';
@@ -28194,13 +28611,13 @@ function renderFlexibleWinConditionPanel(rows, scores){
         {re:/ナイフ強化/, name:'ナイフを伸ばすカード', text:'ナイフは作れますが、火力として伸ばすカードを補うと押し切りやすくなります。'},
         {re:/スライペイオフ|スライのペイオフ|スライのリターン/, name:'スライのリターン', text:'スライする動きはありますが、スライしたことで得をするカードがまだ足りません。'},
         {re:/勝ち筋への接続|勝ち筋接続/, name:'勝ち筋につながるカード', text:'手札を回す動きはありますが、敵を倒す勝ち筋へつながるカードを補いたい状態です。'},
-        {re:/防御・補助カード/, name:'防御・補助カード', text:'防御やドローを補い、勝ち筋を安定して動かしやすくします。'},
+        {re:/防御・補助カード/, name:'防御・補助カード', text:'防御・ドロー・手札操作などで、勝ち筋を安定して動かしやすくします。'},
         {re:/毒またはナイフの勝ち筋|毒・ナイフの勝ち筋/, name:'毒・ナイフの勝ち筋', text:'回す動きはありますが、敵を倒すための毒・ナイフ側の勝ち筋を補いたい状態です。'}
       ];
       for(const m of needMap){ if(m.re.test(n)) return {name:m.name, text:m.text}; }
       let text = '今の勝ち筋を安定させるために補いたい要素です。';
       if(/事故/.test(n)) text = '強い動きがあるため、ここからは事故を増やさないカードを優先したいです。';
-      else if(/防御/.test(n)) text = 'セットアップ前に削られすぎないよう、防御を安定させます。';
+      else if(/防御/.test(n)) text = 'セットアップ前に削られすぎないよう、ブロック・脱力・弱体などで被ダメージを抑えます。';
       else if(/アクセス|必要カード|再現/.test(n)) text = '必要カードを引き込み、勝ち筋の再現性を上げます。';
       else if(/フロント|初動/.test(n)) text = '戦闘開始直後に使える火力や防御を補います。';
       else if(/決定力|出口|フィニッシャ/.test(n)) text = '勝ち筋を最後まで押し切るカードを補います。';
@@ -28213,6 +28630,21 @@ function renderFlexibleWinConditionPanel(rows, scores){
     if(route !== 'clearCapable' && blockerNames.length){
       blockerNames.forEach(function(n){ weaknesses.push(tagObj(n, 'caution', '注意', 'クリア圏内に上げる前に確認したい要素です。')); });
     }
+    function dedupeFirstViewTagsByName(tags){
+      const priority = {fatal:4, danger:3, caution:2, ok:1};
+      const byName = {};
+      (Array.isArray(tags) ? tags : []).forEach(function(t){
+        if(!t) return;
+        const name = String(t.name || t.rawName || '').trim();
+        if(!name) return;
+        const score = priority[String(t.className || '')] || 0;
+        if(!byName[name] || score > (priority[String(byName[name].className || '')] || 0)){
+          byName[name] = t;
+        }
+      });
+      return Object.keys(byName).map(function(name){ return byName[name]; });
+    }
+    weaknesses = dedupeFirstViewTagsByName(weaknesses);
     if(!weaknesses.length){
       weaknesses = route === 'clearCapable'
         ? [tagObj('未対応要素あり', 'caution', '注意'), tagObj('事故リスク', 'caution', '注意')]
@@ -28224,7 +28656,7 @@ function renderFlexibleWinConditionPanel(rows, scores){
     if(!needs.length){
       needs = route === 'clearCapable'
         ? ['事故を増やさないカード','防御の安定化','必要カードへのアクセス'].map(needObj)
-        : ['防御支え','再現性','決定力'].map(needObj);
+        : ['防御の安定性','再現性','決定力'].map(needObj);
     }
     const clearCapable = route === 'clearCapable' || !!candidate.clearCapableCandidate;
     const clearState = clearCapable ? {clear:true, source:'silentFirstViewLimitedConnect'} : {clear:false, source:'silentFirstViewLimitedConnect', blockers:blockerNames};
@@ -31553,10 +31985,61 @@ function hasDiscardRoleForAnalysis(card, role){
       if(defense < 50){ act156PushUnique(causes,'長期防御'); act156PushUnique(needs,'継続防御'); }
       if(!causes.length){ act156PushUnique(causes,'長期戦対応'); act156PushUnique(needs,'勝ち筋接続'); }
     }
-    return {act:act, causes:causes.slice(0,4), needs:needs.slice(0,4), clearCapable:act156ClearCapable};
+    var data = {act:act, causes:causes.slice(0,4), needs:needs.slice(0,4), clearCapable:act156ClearCapable};
+    data.actEvaluation = evalInfo || {};
+    data.bossRisk = act247BossRiskInfo(a);
+    return data;
+  }
+  function act247RankRiskValue(rank){
+    rank = String(rank || '').toUpperCase();
+    if(rank === 'D' || rank === 'E') return 3;
+    if(rank === 'C') return 2;
+    if(rank === 'B') return 1;
+    return 0;
+  }
+  function act247BossRiskInfo(a){
+    try{
+      if(typeof buildBossPrediction === 'function'){
+        var p = buildBossPrediction(a || {});
+        var score = Number(p && p.score);
+        var rank = String(p && p.rank || '').toUpperCase();
+        return {rank:rank, score:Number.isFinite(score) ? score : null, high:(rank === 'D' || (Number.isFinite(score) && score < 45)), mid:(rank === 'C' || (Number.isFinite(score) && score < 60)), risks:arr(p && p.risks)};
+      }
+    }catch(e){}
+    return {rank:'', score:null, high:false, mid:false, risks:[]};
+  }
+  function act247HasActRisk(data, e, boss){
+    var rankRisk = act247RankRiskValue(e && e.rank);
+    var causes = data && data.causes || [];
+    var seriousCause = causes.some(function(x){ return /序盤対応力不足|初動火力|初動防御|手札事故|AoE不足|全体攻撃不足|エナジー不足|防御継続|スケール不足|ボス火力|火力不足/.test(String(x)); });
+    return rankRisk >= 2 || !!(boss && boss.high) || !!seriousCause;
+  }
+  function act247DangerFromActContext(data, e, boss){
+    var rankRisk = act247RankRiskValue(e && e.rank);
+    if((boss && boss.high) || rankRisk >= 3) return {text:'高', cls:'danger'};
+    if(rankRisk >= 2 || act247HasActRisk(data, e, boss)) return {text:'中', cls:'warn'};
+    return act156DangerFromScore(e && e.score, data && data.causes || []);
+  }
+  function act247ClearActSummary(data, e, boss){
+    var label = (e && e.label) || (data && data.act === 'act3' ? 'Act3' : (data && data.act === 'act2' ? 'Act2' : 'Act1'));
+    if(act247HasActRisk(data, e, boss)){
+      return '勝ち筋自体はかなり形になっていますが、' + label + 'では初動・短期火力・AoE・エナジー負荷など、選択中Actの要求を別に確認したい状態です。';
+    }
+    return '主要な勝ち筋はかなり形になっており、デッキだけで見るとクリアを狙える水準です。ここからはデッキだけでは見えない要素にも注意してください。';
   }
   function act156Comment(data){
     var causes = data.causes || [];
+    var e = data.actEvaluation || {};
+    var boss = data.bossRisk || {high:false, mid:false};
+    if(data && data.clearCapable && act247HasActRisk(data, e, boss)){
+      if(data.act === 'act1'){
+        if(causes.indexOf('手札事故') >= 0) return '勝ち筋自体は強いですが、Act1では重さ・初動・AoE不足で動き出す前に削られやすい状態です。';
+        if(causes.indexOf('初動火力') >= 0) return '勝ち筋自体は強いですが、Act1では短期火力やAoEが足りず、雑魚戦やエリート戦で被弾が増えやすい状態です。';
+        return '勝ち筋自体は強いですが、Act1では序盤要求を満たせるかを別に確認したい状態です。';
+      }
+      if(data.act === 'act2') return '勝ち筋自体は強いですが、Act2では横並び・高火力連打・エナジー負荷で崩れないかを確認したい状態です。';
+      return '勝ち筋自体は強いですが、Act3ではボス戦で再現できるか、スケール・回転・事故耐性を確認したい状態です。';
+    }
     if(data && data.clearCapable){
       if(data.act === 'act3') return 'Act3向けの長期戦要素は見えています。大きな補強よりも、ボス戦で再現できるかとプレイ判断のブレに注意したい状態です。';
       if(data.act === 'act2') return 'Act2の横並び・高火力にはある程度対応できます。大きな補強よりも、AoEや継続防御を薄くしすぎないか確認したい状態です。';
@@ -31578,7 +32061,14 @@ function hasDiscardRoleForAnalysis(card, role){
     return 'Act3では、ボス戦で勝ち筋を再現できるか、スケールと決定力を確認します。';
   }
   function act156EnemyNote(data){
-    if(data && data.clearCapable) return ['雑魚：安定','エリート：大きな危険は少ない','ボス：再現性と判断だけ確認'];
+    var e = data && data.actEvaluation || {};
+    var boss = data && data.bossRisk || {high:false, mid:false};
+    if(data && data.clearCapable && !act247HasActRisk(data, e, boss)) return ['雑魚：安定','エリート：大きな危険は少ない','ボス：再現性と判断だけ確認'];
+    if(data && data.clearCapable && act247HasActRisk(data, e, boss)){
+      if(data.act === 'act1') return ['雑魚：初動火力と手札事故に注意','エリート：短期火力・AoE・防御の両立が必要','ボス：押し切る火力と再現性を確認'];
+      if(data.act === 'act2') return ['雑魚：横並び処理に注意','エリート：高火力連打と手札事故に注意','ボス：継続防御と火力の伸びを確認'];
+      return ['雑魚：状態異常や高HP敵で失速しないか確認','エリート：事故耐性と決定力を確認','ボス：長期戦の再現性が重要'];
+    }
     if(data.act === 'act1' && data.causes && data.causes.indexOf('序盤対応力不足') >= 0) return ['雑魚：序盤対応力不足に注意','エリート：フロントカードと初動防御が必要','ボス：まずAct1突破力を整える'];
     if(data.act === 'act1') return ['雑魚：初動火力不足に注意','エリート：防御と短期火力の両立が必要','ボス：スケール不足なら長期戦に注意'];
     if(data.act === 'act2') return ['雑魚：横並び処理に注意','エリート：高火力連打に注意','ボス：継続防御と火力の伸びが必要'];
@@ -31596,12 +32086,13 @@ function hasDiscardRoleForAnalysis(card, role){
     var e = a.actEvaluation || {};
     var label = e.label || (typeof currentAct !== 'undefined' && currentAct === 'act3' ? 'Act3' : (typeof currentAct !== 'undefined' && currentAct === 'act2' ? 'Act2' : 'Act1'));
     var data = act156CauseData(a);
-    var danger = data.clearCapable ? {text:'低', cls:''} : act156DangerFromScore(e.score, data.causes);
+    var bossRisk = data.bossRisk || act247BossRiskInfo(a);
+    var danger = data.clearCapable ? act247DangerFromActContext(data, e, bossRisk) : act156DangerFromScore(e.score, data.causes);
     var comment = act156Comment(data);
     var total = Number.isFinite(Number(e.score)) ? Math.round(Number(e.score)) : 0;
     var rank = e.rank || '-';
     var summary = data.clearCapable
-      ? '主要な勝ち筋が成立しており、火力・防御・スケールも高い水準です。大きな補強よりも、無理なルート選択・事故リスクを上げないピック・プレイ判断のブレに注意したい状態です。'
+      ? act247ClearActSummary(data, e, bossRisk)
       : (e.comment || '選択中Actでの総合評価を確認します。');
     var enemyNotes = act156EnemyNote(data);
     panel.innerHTML = '<div class="actDangerAnalysisTitle">Act別危険分析</div>'
@@ -33619,7 +34110,7 @@ function hasDiscardRoleForAnalysis(card, role){
   function impl162State(score){ return typeof winConditionState === 'function' ? winConditionState(score) : {label:'A（成立）', cls:'ok', rank:'A'}; }
   function impl162Axis(name, summary, tags, score, character){
     var st = impl162State(score || 88);
-    return {key:name, name:name, title:name, axis:name, score:score || 88, state:st, stage:st, summary:summary, reason:summary, needs:tags||['大きな不足なし'], tags:tags||['大きな不足なし'], character:character};
+    return {key:name, name:name, title:name, axis:name, score:score || 88, state:st, stage:st, summary:summary, reason:summary, needs:tags||['主軸パーツはそろっています'], tags:tags||['主軸パーツはそろっています'], character:character};
   }
   function impl164OverallAOrBetter(result){
     var e = (result && result.actEvaluation) || {};
@@ -35323,7 +35814,7 @@ function hasDiscardRoleForAnalysis(card, role){
   }
   function packageAxisObject(name, score, summary, tags){
     var st = typeof winConditionState === 'function' ? winConditionState(score) : {rank:'A',stage:'成立',label:'A（成立）',cls:'ok'};
-    return {key:name, name:name, title:name, axis:name, score:score, state:st, stage:st, summary:summary, reason:summary, needs:tags || ['大きな不足なし'], tags:tags || ['大きな不足なし']};
+    return {key:name, name:name, title:name, axis:name, score:score, state:st, stage:st, summary:summary, reason:summary, needs:tags || ['主軸パーツはそろっています'], tags:tags || ['主軸パーツはそろっています']};
   }
   function applyCompletedPackageRecognition(result, cards){
     if(!result) return result;
@@ -35626,7 +36117,7 @@ function hasDiscardRoleForAnalysis(card, role){
         var genericText = 'このデッキがどの勝ち筋へ向かっているかを確認する軸です。';
         var description = (axisName === '弱体軸' && baseText && baseText !== genericText) ? baseText : (profile && profile.description ? profile.description : (baseText && baseText !== genericText ? baseText : localAxisDescription(axisName)));
         if(!description) return null;
-        var tags = profile && profile.tags ? profile.tags.slice() : (Array.isArray(base.needs) ? base.needs.slice(0,3) : ['大きな不足なし']);
+        var tags = profile && profile.tags ? profile.tags.slice() : (Array.isArray(base.needs) ? base.needs.slice(0,3) : ['主軸パーツはそろっています']);
         return Object.assign({}, base, {
           key:key,
           name:axisName,
@@ -37220,7 +37711,7 @@ function hasDiscardRoleForAnalysis(card, role){
       rank = 'A'; capReason = '完成には、最後に削り切る手段が必要です。';
     }
     if(rank === 'S' && !hasIndependentExhaustEnabler){
-      rank = 'B'; capReason = '廃棄を始める手段がない場合、廃棄時攻撃や決定力だけではSにしない';
+      rank = 'B'; capReason = '廃棄を始める手段がない場合、廃棄時攻撃や決定力だけでは完成扱いにしない';
     }
     if(rank === 'A' && darkEmbraceCards.length > 0 && !feelNoPainCards.length && !effectiveBattleDrum && !hasWinExit && !hasCorruption && normalEnablers.length <= 1){
       rank = 'B'; capReason = 'ドローだけでなく、火力・防御・エナジーにつながるかも見ます。';
@@ -37255,7 +37746,7 @@ function hasDiscardRoleForAnalysis(card, role){
     if(feelNoPainCards.length && hasEnabler && !hasDrawEngine && !hasEnergyEngine && !hasWinExit) warnings.push('廃棄防御に寄っており、火力・ドロー・エナジーへの展開が薄い');
     if(battleDrumCards.length && !hasCorruption) warnings.push('戦いのドラムは堕落なしではエナジー循環として不安定');
     if(hasKindling && !hasExternalPayoff) warnings.push('焚きつけは廃棄を活かすカードなしではランダム生成と事故リスクが残る');
-    if(rank === 'A' && !hasWinExit) warnings.push('成立寄りだが、Sに必要な決定力/フィニッシャーが不足');
+    if(rank === 'A' && !hasWinExit) warnings.push('成立寄りだが、完成寄りに必要な決定力/フィニッシャーが不足');
     if(singleShotFinishers.length && !hasExternalPayoff) warnings.push('単発火力はあるが、継続的な廃棄のリターンが薄い');
     if(hasOnlyTriggeredPayoffWithoutEnabler) warnings.push('廃棄時攻撃/効果はありますが、別の廃棄始動がないため未接続');
     if(hasOnlyReactivePayoffWithoutEnabler) warnings.push('廃棄された時に得するカードはありますが、廃棄を始める手段がないため未接続');
@@ -37486,7 +37977,7 @@ function hasDiscardRoleForAnalysis(card, role){
     }
     if(rank === 'S' && (!hasHighBlock || !hasBlockPayoff || !(hasBodySlamPlan || hasJuggernautPlan))){
       rank = 'A';
-      capReason = 'Sには高ブロック生成と明確な決定力を要求するため、A止まりです。';
+      capReason = '完成寄りには高ブロック生成と明確な決定力が必要なため、A相当です。';
     }
 
     const supportStructures = {
@@ -37818,7 +38309,7 @@ function hasDiscardRoleForAnalysis(card, role){
     }
     if(rank === 'S' && (!hasDamagePayoff || !hasUptime || !hasMeaningfulAttackOpportunity)){
       rank = 'A';
-      capReason = 'Sには弱体維持・攻撃機会・火力ペイオフを要求するためA止まり。';
+      capReason = '完成寄りには弱体維持・攻撃機会・火力ペイオフが必要なため、A相当です。';
     }
     const rankBeforeSupplyCap = rank;
     if(vulnerableSupplyRankCap === 'C' && (rank === 'B' || rank === 'A' || rank === 'S')){
@@ -38132,7 +38623,7 @@ function hasDiscardRoleForAnalysis(card, role){
     let capReason = '';
     if(rank === 'S' && (!hasHpSustain || !hasFinisher || conversionKinds < 3)){
       rank = 'A';
-      capReason = '自傷カードが多いだけ、または単体テンポだけではSにしない。Sには防御・ドロー・決定力を要求。';
+      capReason = '自傷カードが多いだけ、または単体テンポだけでは完成扱いにしない。完成寄りには防御・ドロー・決定力が必要。';
     }
     if((rank === 'A' || rank === 'S') && !hasHpSafety){
       rank = 'B';
@@ -38245,7 +38736,7 @@ function hasDiscardRoleForAnalysis(card, role){
     if(highRisk) warnings.push('HP消費量に対して防御・回復が不足');
     if(hasPayoff && !hasEnabler) warnings.push('自傷ペイオフが孤立');
     if(hasEnabler && !hasPayoff && hasImmediateReturn) warnings.push('HP消費はリターンに変わるが、継続ペイオフは薄い');
-    if(rank !== 'S' && hasEnabler) warnings.push('Sには防御・ドロー・決定力を追加で要求');
+    if(rank !== 'S' && hasEnabler) warnings.push('完成寄りには防御・ドロー・決定力も追加で必要');
 
     let nextNeed = '自傷始動 / 自傷ペイオフ / 防御';
     if(!hasEnabler) nextNeed = 'HPを支払うカード';
@@ -39351,7 +39842,7 @@ function hasDiscardRoleForAnalysis(card, role){
     }).join('');
   }
   function missingWarnHtmlProbe(axis){
-    const missingHtml = (axis.missingPieces || []).map(function(x){ return '<span class="probeChip bad">'+escProbe(x)+'</span>'; }).join('') || '<span class="probeChip ok">大きな不足なし</span>';
+    const missingHtml = (axis.missingPieces || []).map(function(x){ return '<span class="probeChip bad">'+escProbe(x)+'</span>'; }).join('') || '<span class="probeChip ok">主軸パーツはそろっています</span>';
     const warnHtml = (axis.warnings || []).map(function(x){ return '<span class="probeChip warn">'+escProbe(x)+'</span>'; }).join('') || '<span class="probeChip ok">警告なし</span>';
     return '<div class="probeChipRow">'+missingHtml+'</div><div class="probeChipRow">'+warnHtml+'</div>';
   }
@@ -39921,11 +40412,21 @@ function hasDiscardRoleForAnalysis(card, role){
       summary.earlyResponse.established = ['最低限の初動'];
       summary.earlyResponse.improvements = ['フロントカード','AoEの質','エリート突破力','セットアップ速度'];
     }else{
-      if(summary.frontloadScore >= 55) summary.earlyResponse.established.push('フロントロード'); else summary.earlyResponse.improvements.push('フロントカード');
-      if((summary.supportMetricSnapshot['エリート突破力'] || 0) >= 55 || summary.eliteBreakthroughContributors.length) summary.earlyResponse.established.push('エリート突破力'); else summary.earlyResponse.improvements.push('エリート突破力');
-      if((summary.supportMetricSnapshot['AoEの質'] || summary.supportMetricSnapshot['AoE'] || 0) < 55) summary.earlyResponse.improvements.push('AoEの質');
-      summary.earlyResponse.established = unique(summary.earlyResponse.established.length ? summary.earlyResponse.established : ['最低限の初動']);
-      summary.earlyResponse.improvements = unique(summary.earlyResponse.improvements.concat(summary.earlyResponse.score < 55 ? ['セットアップ速度'] : []));
+      const earlyOverallScore = Number(summary.earlyResponse && summary.earlyResponse.score || summary.earlyResponseScore || summary.frontloadScore || 0);
+      const earlyLow = earlyOverallScore < 55;
+      if(earlyLow){
+        summary.earlyResponse.established = ['なし'];
+        summary.earlyResponse.improvements = ['フロントカード','軽い火力','AoE'];
+        if((summary.supportMetricSnapshot['AoEの質'] || summary.supportMetricSnapshot['AoE'] || 0) < 55) summary.earlyResponse.improvements.push('AoEの質');
+        if((summary.supportMetricSnapshot['エナジー'] || 0) < 55 || summary.energyScore < 55) summary.earlyResponse.improvements.push('エナジー負荷');
+        summary.earlyResponse.improvements = unique(summary.earlyResponse.improvements.concat(['セットアップ速度']));
+      }else{
+        if(summary.frontloadScore >= 55) summary.earlyResponse.established.push('フロントロード'); else summary.earlyResponse.improvements.push('フロントカード');
+        if((summary.supportMetricSnapshot['エリート突破力'] || 0) >= 55 || summary.eliteBreakthroughContributors.length) summary.earlyResponse.established.push('エリート突破力'); else summary.earlyResponse.improvements.push('エリート突破力');
+        if((summary.supportMetricSnapshot['AoEの質'] || summary.supportMetricSnapshot['AoE'] || 0) < 55) summary.earlyResponse.improvements.push('AoEの質');
+        summary.earlyResponse.established = unique(summary.earlyResponse.established.length ? summary.earlyResponse.established : ['最低限の初動']);
+        summary.earlyResponse.improvements = unique(summary.earlyResponse.improvements.concat(summary.earlyResponse.score < 55 ? ['セットアップ速度'] : []));
+      }
     }
     return summary;
   }
@@ -40105,6 +40606,81 @@ function hasDiscardRoleForAnalysis(card, role){
 #sts2SilentAxesProbe .probeChip.bad{background:#fee2e2;border-color:#fecaca;color:#991b1b}
 #sts2SilentAxesProbe pre{max-height:420px;overflow:auto;background:#0f172a;color:#e2e8f0;border-radius:12px;padding:12px;font-size:12px;line-height:1.5;white-space:pre-wrap}
 @media(max-width:760px){#sts2SilentAxesProbe .probeGrid{grid-template-columns:1fr}#sts2SilentAxesProbe{padding:14px}}
+
+
+/* v1_9: character picker chip design distinct from main tabs */
+.characterSelectPanel .heroTabs{
+  gap:10px;
+  margin-top:12px;
+  margin-bottom:12px;
+  align-items:center;
+}
+.characterSelectPanel .heroTab{
+  position:relative;
+  border:1px solid #cbd5e1;
+  background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);
+  color:#334155;
+  padding:9px 13px;
+  border-radius:999px;
+  box-shadow:0 1px 0 rgba(15,23,42,.04);
+  font-size:13px;
+  font-weight:900;
+  line-height:1.2;
+}
+.characterSelectPanel .heroTab:not(.active):not(.pending):hover{
+  border-color:#93c5fd;
+  background:#f8fbff;
+  transform:translateY(-1px);
+}
+.characterSelectPanel .heroTab.active{
+  background:linear-gradient(180deg,#dbeafe 0%,#bfdbfe 100%);
+  color:#1d4ed8;
+  border-color:#60a5fa;
+  box-shadow:0 8px 18px rgba(37,99,235,.16);
+}
+.characterSelectPanel .heroTab.active::before{
+  content:"✓";
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:16px;
+  height:16px;
+  margin-right:6px;
+  border-radius:999px;
+  background:#2563eb;
+  color:white;
+  font-size:11px;
+  font-weight:950;
+  vertical-align:1px;
+}
+.characterSelectPanel .heroTab.active::after{
+  content:"選択中";
+  margin-left:7px;
+  padding:2px 6px;
+  border-radius:999px;
+  background:rgba(255,255,255,.72);
+  color:#1d4ed8;
+  font-size:10px;
+  font-weight:950;
+}
+.characterSelectPanel .heroTab.pending::after{
+  content:"準備中";
+  margin-left:7px;
+  font-size:10px;
+  font-weight:950;
+}
+#view-diagnosis .characterSelectPanel .heroTabs{
+  gap:7px !important;
+}
+#view-diagnosis .characterSelectPanel .heroTab{
+  border-radius:999px !important;
+  padding:7px 10px !important;
+  font-size:12px !important;
+}
+#view-diagnosis .characterSelectPanel .heroTab.active::after{
+  content:"";
+  display:none;
+}
 </style>
 <script id="impl246-debug-silent-axes-probe-v1">
 (function(){
@@ -40116,10 +40692,10 @@ function hasDiscardRoleForAnalysis(card, role){
     - B以上には、スライの起点に加えて、スライカード / スライのペイオフ / 捨てられた時に得するカードを要求する。
     - C: 回るだけ、またはスライの起点だけ、またはスライ側のリターンがない状態。回転補助あり / スライ軸未成立として扱う。
     - B: スライで回る形がある。スライの起点 + スライリターン + ドロー/エナジー/手札交換が見えている。
-    - A: B条件に加えて、防御しながら回せる支えがある。
+    - A: B条件に加えて、被ダメージを抑えながら回せる手段がある。
     - S: A条件に加えて、毒軸またはナイフ軸がA以上で、スライがその主勝ち筋への到達性・再現性を高める。
-    - 跳弾 / メメント・モリ等のdiscardFinisherは補助火力として見るが、S条件にはしない。
-    - 専用のpoisonDiscardLink / discardShivLinkは接続ログに残すが、S条件の必須にはしない。
+    - 跳弾 / メメント・モリ等のdiscardFinisherは補助火力として見るが、完成条件にはしない。
+    - 専用のpoisonDiscardLink / discardShivLinkは接続ログに残すが、完成条件の必須にはしない。
   */
   function arr(v){ return Array.isArray(v) ? v : (v == null ? [] : [v]); }
   function text(v){ return String(v == null ? '' : v); }
@@ -40411,7 +40987,7 @@ function hasDiscardRoleForAnalysis(card, role){
     if(conditionalEn.length && !discardEnablers.length) warnings.push('毒の薄霧はスライの起点がないと毒×スライ接続として機能しにくいです。');
     if(baseEn.length===1 && pay.length===0) warnings.push('毒1枚だけでは毒軸成立ではなく、毒始動だけの状態です。');
     if(fin.length>0 && en.length<1) warnings.push('促進剤などの毒フィニッシャーはありますが、毒を入れる手段が不足しています。');
-    if(defense.length<2 && en.length>0) warnings.push('毒が動く前に削られやすいため、防御支えが不足しています。');
+    if(defense.length<2 && en.length>0) warnings.push('毒が動く前に削られやすいため、防御の安定性が不足しています。');
     var rawScore = en.length*16 + pay.length*18 + fin.length*14 + conditionalFin.length*8 + def.length*10 + Math.min(scaling.length,3)*8 + Math.min(access.length,3)*6 + Math.min(defense.length,4)*4 + shivLinks.length*5 + discardLinks.length*5;
     function needS(cond, label){ if(!cond) missingForS.push(label); return cond; }
     function needA(cond, label){ if(!cond) missingForA.push(label); return cond; }
@@ -40419,19 +40995,19 @@ function hasDiscardRoleForAnalysis(card, role){
       needS(en.length>=2,'毒付与2枚相当'),
       needS(pay.length>=1,'毒ペイオフ'),
       needS(fin.length>=1 || conditionalFin.length>=1,'毒の決定力'),
-      needS(defense.length>=3 || def.length>=1,'防御支え'),
+      needS(defense.length>=3 || def.length>=1,'防御の安定性'),
       needS(access.length>=1,'毒パーツへのアクセス')
     ].every(Boolean);
     var aReady = [
       needA(en.length>=2,'毒付与の厚み'),
       needA(pay.length>=1,'毒ペイオフ'),
       needA((fin.length>=1 || conditionalFin.length>=1 || scaling.length>=2 || shivLinks.length>0 || discardLinks.length>0),'決定力または接続'),
-      needA(defense.length>=2 || def.length>=1,'最低限の防御支え')
+      needA(defense.length>=2 || def.length>=1,'最低限の防御の安定性')
     ].every(Boolean);
     var bReady = (en.length>=2) || (en.length>=1 && (pay.length>=1 || fin.length>=1 || conditionalFin.length>=1));
     var rank = sReady ? 'S' : (aReady ? 'A' : (bReady ? 'B' : (rawScore>=25 ? 'C' : 'D')));
     var displayScore = rank==='S' ? Math.max(rawScore,86) : rank==='A' ? Math.max(rawScore,72) : rank==='B' ? Math.max(rawScore,48) : rawScore;
-    var reason = rank==='S' ? '毒供給・防御・再現性・決定力がそろい、毒で勝ち切る形が見えています。' : rank==='A' ? '毒付与とペイオフはつながっています。防御や決定力も見え、毒軸は成立寄りです。' : rank==='B' ? '毒のシナジーは見えていますが、勝ち筋としてはまだ形成中です。' : '毒に関係するカードはありますが、毒軸としてはまだ未成立寄りです。';
+    var reason = rank==='S' ? '毒供給・防御・再現性・決定力がそろい、毒で勝ち切る形が見えています。' : rank==='A' ? '毒付与とペイオフはつながっています。防御や決定力も見え、毒軸は成立寄りです。' : rank==='B' ? '毒のシナジーは見えていますが、勝ち筋としてはまだ形成中です。' : rank==='C' ? '毒に関係するカードはありますが、毒軸としてはまだ未成立寄りです。' : '軸となるカードがまだありません。';
     return makeAxis('poison','毒軸',displayScore,rank,stateFromRank(rank),reason,{poisonScore:clamp(displayScore), rawScore:clamp(rawScore), presentPieces:{poisonEnablers:names(en), conditionalPoisonEnablers:names(conditionalEn), poisonPayoffs:names(pay), poisonFinishers:names(fin), conditionalPoisonFinishers:names(conditionalFin), poisonDefense:names(def), poisonScaling:names(scaling), poisonAccess:names(access), poisonShivLinks:names(shivLinks), poisonDiscardLinks:names(discardLinks)}, missingPieces:unique(missing), warnings:unique(warnings), nextNeed:unique(missing).slice(0,4), rankBeforeCap:rank, capApplied:false, capReason:'', readiness:{sReady:sReady, aReady:aReady, bReady:bReady, missingForS:unique(missingForS), missingForA:unique(missingForA)}, debug:{poisonEnablerCount:en.length, basePoisonEnablerCount:baseEn.length, conditionalPoisonEnablerCount:conditionalEn.length, poisonPayoffCount:pay.length, poisonFinisherCount:fin.length, defenseCount:defense.length, accessCount:access.length}});
   }
   function evaluateSilentShivAxisProbe(cards){
@@ -40458,7 +41034,7 @@ function hasDiscardRoleForAnalysis(card, role){
     if(gen.length===1 && payoffLikeCount===0) warnings.push('ナイフ生成1枚だけでは、ナイフ軸成立とは見ません。');
     if(payoffLikeCount>0 && gen.length<2) warnings.push('ナイフのペイオフはありますが、生成が薄く単独では動きにくいです。');
     if(fin.length>0 && gen.length<1) warnings.push('ナイフの決定力候補はありますが、ナイフ生成が不足しています。');
-    if(gen.length>=2 && payoffLikeCount>0 && !defenseReadyForS) warnings.push('ナイフの形は見えていますが、防御しながら回す支えが薄くS条件には届きません。');
+    if(gen.length>=2 && payoffLikeCount>0 && !defenseReadyForS) warnings.push('ナイフの形は見えていますが、被ダメージを抑えながら回す手段が薄く、クリア圏内にはまだ届きにくい状態です。');
     if(gen.length>=2 && payoffLikeCount>0 && !independentShivGenerationReady) warnings.push('ナイフ生成とペイオフはありますが、スライ接続由来の生成に寄っているためナイフ軸A条件には届きません。');
     var rawScore = gen.length*16 + pay.length*18 + fin.length*12 + aoe.length*8 + def.length*8 + Math.min(access.length,3)*6 + Math.min(defense.length,4)*4 + Math.min(sDefense.length,4)*5 + poisonLinks.length*5;
     function needS(cond, label){ if(!cond) missingForS.push(label); return cond; }
@@ -40468,19 +41044,19 @@ function hasDiscardRoleForAnalysis(card, role){
       needS(independentShivGenerationReady,'独立したナイフ生成'),
       needS(shivScalingReady,'ナイフ強化ペイオフ'),
       needS(shivExitReady,'ナイフの出口 / フィニッシャー'),
-      needS(defenseReadyForS,'防御しながら回せる支え'),
+      needS(defenseReadyForS,'被ダメージを抑えながら回せる手段'),
       needS(safeAccessReady,'防御しながらパーツへ届く再現性')
     ].every(Boolean);
     var aReady = [
       needA(gen.length>=2,'ナイフ生成の厚み'),
       needA(independentShivGenerationReady,'独立したナイフ生成'),
       needA(payoffLikeCount>=1,'ナイフのペイオフまたは決定力'),
-      needA(accessReady || defense.length>=2 || sDefense.length>=1,'最低限のアクセスまたは防御支え')
+      needA(accessReady || defense.length>=2 || sDefense.length>=1,'最低限のアクセスまたは防御の安定性')
     ].every(Boolean);
     var bReady = gen.length>=2 || (gen.length>=1 && payoffLikeCount>=1);
     var rank = sReady ? 'S' : (aReady ? 'A' : (bReady ? 'B' : (rawScore>=25 ? 'C' : 'D')));
     var displayScore = rank==='S' ? Math.max(rawScore,86) : rank==='A' ? Math.max(rawScore,72) : rank==='B' ? Math.max(rawScore,48) : rawScore;
-    var reason = rank==='S' ? 'ナイフ生成・強化・防御・再現性・決定力がそろい、ナイフ軸として完成寄りです。' : rank==='A' ? 'ナイフ生成とペイオフはつながっていますが、Sには防御支えや安全な再現性がもう少し欲しい状態です。' : rank==='B' ? 'ナイフのシナジーは見えていますが、勝ち筋としてはまだ形成中です。' : 'ナイフに関係するカードはありますが、ナイフ軸としてはまだ未成立寄りです。';
+    var reason = rank==='S' ? 'ナイフ生成・強化・防御・再現性・決定力がそろい、ナイフ軸として完成寄りです。' : rank==='A' ? 'ナイフ生成とペイオフはつながっていますが、クリア圏内に近づけるには、防御の安定性と再現性をもう少し補いたい状態です。' : rank==='B' ? 'ナイフのシナジーは見えていますが、勝ち筋としてはまだ形成中です。' : rank==='C' ? 'ナイフに関係するカードはありますが、ナイフ軸としてはまだ未成立寄りです。' : '軸となるカードがまだありません。';
     return makeAxis('shiv','ナイフ軸',displayScore,rank,stateFromRank(rank),reason,{shivScore:clamp(displayScore), rawScore:clamp(rawScore), presentPieces:{shivEnablers:names(gen), independentShivGeneration:names(independentGen), discardBridgeShivGeneration:names(discardBridgeGenDebug), shivGeneratedCards:names(mat), shivPayoffs:names(pay), shivAoESupport:names(aoe), shivFinishers:names(fin), shivDefenseLinks:names(def), shivDefenseSupport:names(sDefense), shivPoisonLinks:names(poisonLinks), shivAccess:names(access)}, missingPieces:unique(missing), warnings:unique(warnings), nextNeed:unique(missing).slice(0,4), rankBeforeCap:rank, capApplied:false, capReason:'', readiness:{sReady:sReady, aReady:aReady, bReady:bReady, independentShivGenerationReady:independentShivGenerationReady, shivScalingReady:shivScalingReady, shivExitReady:shivExitReady, defenseReadyForS:defenseReadyForS, accessReady:accessReady, safeAccessReady:safeAccessReady, missingForS:unique(missingForS), missingForA:unique(missingForA)}, debug:{shivEnablerCount:gen.length, independentShivGenerationCount:independentGen.length, discardBridgeShivGenerationCount:discardBridgeGen.length, discardBridgeShivGenerationDisplayCount:discardBridgeGenDebug.length, independentShivGenerationNames:names(independentGen), discardBridgeShivGenerationNames:names(discardBridgeGenDebug), discardBridgeShivGenerationRankNames:names(discardBridgeGen), discardBridgeShivGenerationDisplayOnlyNames:names(discardBridgeGenDebug).filter(function(n){ return names(discardBridgeGen).indexOf(n)<0; }), shivPayoffCount:pay.length, shivFinisherCount:fin.length, shivDefenseSupportCount:sDefense.length, safeAccessReady:safeAccessReady, generatedShivInDeckCount:mat.length}});
   }
 
@@ -40533,16 +41109,16 @@ function hasDiscardRoleForAnalysis(card, role){
     if(en.length>0 && !actualSlyReturnReady) warnings.push('スライの起点や回転補助はありますが、スライカードや、スライで得をするカードがないためスライ軸B以上にはしません。');
     if(excludedSlyReturnCards.length>0 && !actualSlyReturnReady) warnings.push('フロントカードやスライの起点はありますが、'+names(excludedSlyReturnCards).join(' / ')+' は今回のスライ実リターン条件には数えません。');
     if(rotationOnlyReady) warnings.push('ドロー・手札交換・防御で回る形はありますが、捨てた時に得するカードがなく、スライ軸としては未成立寄りです。');
-    if(slyEngineReady && !majorWinPlanReady && !safetyReady) warnings.push('スライで回る形はありますが、防御しながら回す支えがまだ薄いです。');
+    if(slyEngineReady && !majorWinPlanReady && !safetyReady) warnings.push('スライで回る形はありますが、被ダメージを抑えながら回す手段がまだ薄いです。');
     if(slyEngineReady && safetyReady && !majorWinPlanReady) warnings.push('回しながら耐える形はありますが、毒・ナイフなどの主勝ち筋はまだA以上ではありません。');
-    if(hasPureMinorDamage && !majorWinPlanReady) warnings.push('跳弾やメメント・モリ系の補助火力はありますが、それだけではスライ軸S条件にはしません。');
+    if(hasPureMinorDamage && !majorWinPlanReady) warnings.push('跳弾やメメント・モリ系の補助火力はありますが、それだけではスライ軸の完成条件にはしません。');
     var rawScore = en.length*12 + pay.length*16 + sly.length*10 + engines.length*5 + fin.length*8 + shivLinks.length*5 + poisonLinks.length*5 + Math.min(access.length,4)*4 + Math.min(defense.length,4)*2 + Math.min(sDefense.length,3)*6 + (majorWinPlanReady?14:0);
     function needS(cond, label){ if(!cond) missingForS.push(label); return cond; }
     function needA(cond, label){ if(!cond) missingForA.push(label); return cond; }
     function needB(cond, label){ if(!cond) missingForB.push(label); return cond; }
     var sReady = [
       needS(slyEngineThick,'スライエンジンの厚み'),
-      needS(stableSafetyReady,'防御しながら回せる支え'),
+      needS(stableSafetyReady,'被ダメージを抑えながら回せる手段'),
       needS(majorWinPlanReady,'毒軸またはナイフ軸A以上'),
       needS(reliabilityBoostReady,'主勝ち筋への到達性・再現性')
     ].every(Boolean);
@@ -40558,7 +41134,7 @@ function hasDiscardRoleForAnalysis(card, role){
     var cReady = rotationOnlyReady || en.length>=1 || actualSlyReturnReady || access.length>=2 || engines.length>=1;
     var rank = sReady ? 'S' : (aReady ? 'A' : (bReady ? 'B' : (cReady || rawScore>=25 ? 'C' : 'D')));
     var displayScore = rank==='S' ? Math.max(rawScore,86) : rank==='A' ? Math.max(rawScore,72) : rank==='B' ? Math.max(rawScore,48) : rank==='C' ? Math.min(rawScore,44) : rawScore;
-    var reason = rank==='S' ? 'スライで手札を回しながら防御でき、成立済みの毒・ナイフ勝ち筋への到達性と再現性を高めています。' : rank==='A' ? 'スライで回る形があり、防御しながら動ける支えも見えています。' : rank==='B' ? 'スライカードや、スライで得をするカードを使って回る形は見えていますが、防御支えや主勝ち筋の安定稼働まではまだ形成中です。' : rank==='C' ? 'スライの起点や回転補助はありますが、スライカード / スライのペイオフが不足しており、スライ軸としては未成立寄りです。' : 'スライ軸としてはまだ未成立です。';
+    var reason = rank==='S' ? 'スライで手札を回しながら防御でき、成立済みの毒・ナイフ勝ち筋への到達性と再現性を高めています。' : rank==='A' ? 'スライで回る形があり、被ダメージを抑えながら動ける形も見えています。' : rank==='B' ? 'スライカードや、スライで得をするカードを使って回る形は見えていますが、防御の安定性や主勝ち筋の安定稼働まではまだ形成中です。' : rank==='C' ? 'スライの起点や回転補助はありますが、スライカード / スライのペイオフが不足しており、スライ軸としては未成立寄りです。' : 'スライ軸としてはまだ未成立です。';
     return makeAxis('discard','スライ軸',displayScore,rank,stateFromRank(rank),reason,{discardScore:clamp(displayScore), rawScore:clamp(rawScore), presentPieces:{discardEnablers:names(en), actualSlyReturns:names(actualSlyReturnCards), excludedSlyReturnCandidates:names(excludedSlyReturnCards), slyCards:names(sly), slyPayoffs:names(pay), slyEngines:names(engines), slyMinorDamage:names(fin), connectedToShiv:names(shivLinks), connectedToPoison:names(poisonLinks), discardDefenseSupport:names(sDefense), discardAccess:names(access), supportedMajorAxes:supportedMajorAxes}, missingPieces:unique(missing), warnings:unique(warnings), nextNeed:unique(missing).slice(0,4), rankBeforeCap:rank, capApplied:false, capReason:'', readiness:{sReady:sReady, aReady:aReady, bReady:bReady, cReady:cReady, missingForS:unique(missingForS), missingForA:unique(missingForA), missingForB:unique(missingForB), actualSlyReturnReady:actualSlyReturnReady, rotationOnlyReady:rotationOnlyReady, slyCoreReady:slyCoreReady, slyEngineReady:slyEngineReady, slyEngineThick:slyEngineThick, safetyReady:safetyReady, stableSafetyReady:stableSafetyReady, majorWinPlanReady:majorWinPlanReady, reliabilityBoostReady:reliabilityBoostReady, hasPureMinorDamage:hasPureMinorDamage, hasBridgeConnection:hasBridgeConnection}, debug:{discardEnablerCount:en.length, actualSlyReturnCount:actualSlyReturnCards.length, excludedSlyReturnCandidateCount:excludedSlyReturnCards.length, slyCardCount:sly.length, discardPayoffCount:pay.length, discardEngineCount:engines.length, discardDefenseSupportCount:sDefense.length, supportedMajorAxes:supportedMajorAxes, hasWinConnection:majorWinPlanReady || hasPureMinorDamage || hasBridgeConnection, actualSlyReturnReady:actualSlyReturnReady, rotationOnlyReady:rotationOnlyReady}});
   }
   function rankValue(rank){ return rank==='S'?5:rank==='A'?4:rank==='B'?3:rank==='C'?2:rank==='D'?1:0; }
@@ -40583,14 +41159,14 @@ function hasDiscardRoleForAnalysis(card, role){
     var silentFrontDebug = silentFrontloadDebugFromDeck(allCards);
     var defense = cards.filter(isDefense), access = cards.filter(isAccess), front = cards.filter(isFront);
     var clearCapableBlockers=[];
-    if(!sRankAxes.length) clearCapableBlockers.push('S軸なし');
-    if(defense.length<3) clearCapableBlockers.push('防御不足');
+    if(!sRankAxes.length) clearCapableBlockers.push('クリア圏内まであと一歩');
+    if(defense.length<3) clearCapableBlockers.push('防御の安定性不足');
     if(access.length<2) clearCapableBlockers.push('再現性不足');
     if(front.length<2) clearCapableBlockers.push('初動不足');
 
-    // v1_11: S軸はclearCapable候補だが、S=クリア圏内とは扱わない。
-    // 特にスライSは「到達性・再現性エンジン」の完成を示すため、
-    // 接続先の毒/ナイフ主勝ち筋がS級に届いていない場合はclearCapableを慎重化する。
+    // v1_11: 完成軸はclearCapable候補だが、完成=クリア圏内とは扱わない。
+    // 特にスライ軸の完成は「到達性・再現性エンジン」の完成を示すため、
+    // 接続先の毒/ナイフ主勝ち筋が完成級に届いていない場合はclearCapableを慎重化する。
     var clearCapableGuardReasons=[];
     var hasPoisonS = poison && poison.rank === 'S';
     var hasShivS = shiv && shiv.rank === 'S';
@@ -40602,12 +41178,12 @@ function hasDiscardRoleForAnalysis(card, role){
       if(shiv && rankValue(shiv.rank) >= 4){
         if(shivMissingForS.indexOf('ナイフ強化ペイオフ') >= 0) clearCapableGuardReasons.push('ナイフ強化不足');
         if(shivMissingForS.indexOf('ナイフの出口 / フィニッシャー') >= 0) clearCapableGuardReasons.push('ナイフの出口不足');
-        if(shivMissingForS.indexOf('防御しながら回せる支え') >= 0) clearCapableGuardReasons.push('長期戦安定性不足');
+        if(shivMissingForS.indexOf('被ダメージを抑えながら回せる手段') >= 0) clearCapableGuardReasons.push('長期戦安定性不足');
         if(shivMissingForS.indexOf('防御しながらパーツへ届く再現性') >= 0) clearCapableGuardReasons.push('再現性不足');
         if(!clearCapableGuardReasons.length) clearCapableGuardReasons.push('ナイフ主勝ち筋の完成度確認');
       }else if(poison && rankValue(poison.rank) >= 4){
         if(poisonMissingForS.indexOf('毒の決定力') >= 0) clearCapableGuardReasons.push('毒の決定力不足');
-        if(poisonMissingForS.indexOf('防御支え') >= 0) clearCapableGuardReasons.push('長期戦安定性不足');
+        if(poisonMissingForS.indexOf('防御の安定性') >= 0) clearCapableGuardReasons.push('長期戦安定性不足');
         if(poisonMissingForS.indexOf('毒パーツへのアクセス') >= 0) clearCapableGuardReasons.push('再現性不足');
         if(!clearCapableGuardReasons.length) clearCapableGuardReasons.push('毒主勝ち筋の完成度確認');
       }else{
@@ -40636,6 +41212,9 @@ function hasDiscardRoleForAnalysis(card, role){
     }else{
       if((silentFrontDebug.frontloadScore||0) < 35) needs = unique(['フロントカード','軽い火力'].concat(needs));
       if((silentFrontDebug.earlyResponseScore||0) < 35) warnings = unique(['序盤対応力不足'].concat(warnings));
+    }
+    if(/starterCandidate|unformedCandidate/.test(route)){
+      clearCapableBlockers = unique(clearCapableBlockers.map(function(x){ return x === 'クリア圏内まであと一歩' ? '主軸未成立' : x; }));
     }
     return {bestAxis:best, secondaryAxis:second, primaryAxes:established, formingAxes:forming, unformedAxes:unformed, connectedAxes:cross.filter(function(x){return x.connected;}), crossAxisLinks:cross, mainWinPlanName:best ? best.name : null, diagnosisNameCandidate:diag, winConditionNameCandidate:winName, reasons:axes.map(function(x){ return x.name+'：'+x.reason; }), nextNeed:needs.slice(0,6), warnings:warnings.slice(0,8), sRankAxes:sRankAxes.map(function(x){ return x.name; }), clearCapableCandidate:clearCapableCandidate, clearCapableBlockers:unique(clearCapableBlockers), clearCapableGuard:clearCapableGuard, silentRouteCandidate:route, support:{frontCards:names(front), defense:names(defense), access:names(access), silentFrontCardNames:silentFrontDebug.silentFrontCardNames}, silentFrontloadDebug:silentFrontDebug, frontloadScore:silentFrontDebug.frontloadScore, earlyResponseScore:silentFrontDebug.earlyResponseScore, starterEquivalentEarly:silentFrontDebug.starterEquivalentEarly, starterEquivalentReason:silentFrontDebug.starterEquivalentReason};
   }
@@ -40692,21 +41271,21 @@ function evaluateSilentAxesProbe(cards, context){
     // route / bestAxis / rank / readiness から、表示用候補をここで一度だけ選ぶ。
     // rawな不足は filterSilentFirstViewNeedsByRouteAndAxis 側で hiddenRawNeeds に残す。
     if(key === 'poison'){
-      if(route === 'formingCandidate') return {next:['防御支え','毒継続供給','毒フィニッシャー'], weakness:['防御不足','再現性不足']};
-      if(sRankCompleted) return {next:['防御支え','毒アクセス','事故防止'], weakness:['防御不足','再現性確認']};
-      return {next:['防御支え','毒アクセス','毒フィニッシャー'], weakness:['防御不足','再現性不足']};
+      if(route === 'formingCandidate') return {next:['防御の安定性','毒継続供給','毒フィニッシャー'], weakness:['防御不足','再現性不足']};
+      if(sRankCompleted) return {next:['防御の安定性','毒アクセス','事故防止'], weakness:['防御不足','再現性確認']};
+      return {next:['防御の安定性','毒アクセス','毒フィニッシャー'], weakness:['防御不足','再現性不足']};
     }
     if(key === 'shiv'){
-      if(route === 'formingCandidate') return {next:['ナイフ生成','ナイフ強化','防御支え'], weakness:['ナイフ出力不足','防御支え不足']};
-      if(sRankCompleted) return {next:['防御支え','再現性','事故防止'], weakness:['防御支え不足','事故リスク','長期戦の安定性確認']};
-      return {next:['ナイフ強化','防御支え','ナイフの出口'], weakness:['防御支え不足','長期戦の決定力不足']};
+      if(route === 'formingCandidate') return {next:['ナイフ生成','ナイフ強化','防御の安定性'], weakness:['ナイフ出力不足','防御の安定性不足']};
+      if(sRankCompleted) return {next:['防御の安定性','再現性','事故防止'], weakness:['防御の安定性不足','事故リスク','長期戦の安定性確認']};
+      return {next:['ナイフ強化','防御の安定性','ナイフの出口'], weakness:['防御の安定性不足','長期戦の決定力不足']};
     }
     if(key === 'discard'){
       if(route === 'formingCandidate'){
-        if(actualSlyReturnReady) return {next:['防御支え','回転した先の勝ち筋','決定力'], weakness:['防御しながら回しにくい','決定力不足']};
-        return {next:['防御支え','スライペイオフ','勝ち筋への接続'], weakness:['防御しながら回しにくい','スライのリターン不足','決定力不足']};
+        if(actualSlyReturnReady) return {next:['防御の安定性','回転した先の勝ち筋','決定力'], weakness:['防御しながら回しにくい','決定力不足']};
+        return {next:['防御の安定性','スライペイオフ','勝ち筋への接続'], weakness:['防御しながら回しにくい','スライのリターン不足','決定力不足']};
       }
-      return {next:['毒またはナイフの勝ち筋','防御支え','決定力'], weakness:['主火力への接続不足','ボス戦の決定力不足']};
+      return {next:['毒またはナイフの勝ち筋','防御の安定性','決定力'], weakness:['主火力への接続不足','ボス戦の決定力不足']};
     }
     return {next:['フロントカード','防御・補助カード','勝ち筋の起点'], weakness:['主軸未成立','決定力不足']};
   }
@@ -40809,7 +41388,7 @@ function evaluateSilentAxesProbe(cards, context){
         }
         return 'スライ軸で手札を回しながら、ナイフの勝ち筋へつなげる形は見えています。ただし、ナイフ側はまだ完成までは届いておらず、強化や決定力を補うとクリア圏内に近づきます。';
       }
-      return 'スライの起点とスライのリターンがあり、防御しながら回す形も見えています。毒やナイフなどの勝ち筋へつながると、さらに安定した主軸になります。';
+      return 'スライの起点とスライのリターンがあり、被ダメージを抑えながら回す形も見えています。毒やナイフなどの勝ち筋へつながると、さらに安定した主軸になります。';
     }
     var headlineMap = {
       clearCapableCandidate:'クリアを狙える水準です。',
@@ -40825,15 +41404,15 @@ function evaluateSilentAxesProbe(cards, context){
     }else if(route === 'clearCapableCandidate'){
       body = '主要な勝ち筋はかなり形になっており、デッキだけで見るとクリアを狙える水準です。ここからはデッキだけでは見えない要素にも注意してください。';
     }else if(route === 'establishedCandidate'){
-      if(best && best.key === 'poison') body = '毒を入れて伸ばす形は見えています。ここからは、防御しながら毒を進める支えや、必要カードを引き込む手段を補うと安定しやすくなります。';
-      else if(best && best.key === 'shiv') body = 'ナイフを作って火力へつなげる形は見えています。ここからは、ナイフを強化するカードや、防御しながら手数を使える支えを補うと安定しやすくなります。';
+      if(best && best.key === 'poison') body = '毒を入れて伸ばす形は見えています。ここからは、被ダメージを抑えながら毒を進めるカードや、必要カードを引き込む手段を補うと安定しやすくなります。';
+      else if(best && best.key === 'shiv') body = 'ナイフを作って火力へつなげる形は見えています。ここからは、ナイフを強化するカードや、被ダメージを抑えながら手数を使えるカードを補うと安定しやすくなります。';
       else if(best && best.key === 'discard') body = silentEstablishedDiscardBody();
       else body = '勝ち筋は成立寄りです。ここからは、防御、再現性、勝ち切る出口を確認します。';
     }else if(route === 'formingCandidate'){
-      if(best && best.key === 'poison') body = '毒のシナジーは見えてきていますが、勝ち筋としてはまだまとまりきっていません。防御しながら毒を進める支えを補うと安定しやすくなります。';
-      else if(best && best.key === 'shiv') body = 'ナイフ軸のシナジーは見えてきていますが、まだ勝ち筋としてはまとまりきっていません。ナイフ強化や防御支えを補うと安定しやすくなります。';
-      else if(best && best.key === 'discard') body = 'スライの起点とスライのリターンはありますが、まだ勝ち筋としてはまとまりきっていません。防御しながら回せる支えを補うと安定しやすくなります。';
-      else body = '軸の方向性は見えています。押し切るには支えや再現性、決定力を補いたい状態です。';
+      if(best && best.key === 'poison') body = '毒のシナジーは見えてきていますが、勝ち筋としてはまだまとまりきっていません。被ダメージを抑えながら毒を進めるカードを補うと安定しやすくなります。';
+      else if(best && best.key === 'shiv') body = 'ナイフ軸のシナジーは見えてきていますが、まだ勝ち筋としてはまとまりきっていません。ナイフ強化や防御の安定性を補うと安定しやすくなります。';
+      else if(best && best.key === 'discard') body = 'スライの起点とスライのリターンはありますが、まだ勝ち筋としてはまとまりきっていません。被ダメージを抑えながら回せる手段を補うと安定しやすくなります。';
+      else body = '軸の方向性は見えています。押し切るには防御の安定性や再現性、決定力を補いたい状態です。';
     }else{
       var frontloadScore = Number(summary.frontloadScore || 0);
       var earlyResponseScore = Number(summary.earlyResponseScore || 0);
